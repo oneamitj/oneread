@@ -6,9 +6,24 @@ import os
 import secrets
 from functools import lru_cache
 from pathlib import Path
+from typing import Annotated
 
 from pydantic import field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+
+#: A list setting that is written as a comma-separated string rather than JSON.
+#:
+#: pydantic-settings decodes any list-typed field from the environment by
+#: running `json.loads` over the raw value, and it does that *before* a
+#: `mode="before"` validator ever sees it. So `ONEREAD_ALLOWED_HOSTS=example.com`
+#: — and `=*`, and `ONEREAD_SAMPLE_MINUTE_CHOICES=1,3,5` — didn't fall back to
+#: the splitters below. They raised `SettingsError` at import and the app never
+#: started, which is a poor way to find out that a setting the README documents
+#: has never worked from the environment.
+#:
+#: `NoDecode` turns that decoding off for the field, leaving the string for
+#: `_split_csv` / `_split_ints` to handle.
+CommaSeparated = Annotated[list[str], NoDecode]
 
 
 class Settings(BaseSettings):
@@ -25,11 +40,11 @@ class Settings(BaseSettings):
     database_url: str = ""  # derived from data_dir when empty
 
     # --- http ---------------------------------------------------------------
-    allowed_hosts: list[str] = ["*"]
+    allowed_hosts: CommaSeparated = ["*"]
     #: Origins allowed to call the API from a browser. Normally empty: the
     #: frontend is served from this same origin, so nothing cross-site is
     #: needed. "*" is refused outright — see `_no_wildcard_origin`.
-    cors_origins: list[str] = []
+    cors_origins: CommaSeparated = []
     #: Ceiling on a request body, for everything except uploads (which carry
     #: their own, larger limit). A 100k-character entry is comfortably inside
     #: this even once JSON escaping has had its way with it.
@@ -54,7 +69,7 @@ class Settings(BaseSettings):
     # A new entry gets read this far, so nobody waits half an hour to find out
     # they picked the wrong voice. The full reading is a deliberate second step.
     sample_minutes: int = 1
-    sample_minute_choices: list[int] = [1, 3, 5]
+    sample_minute_choices: Annotated[list[int], NoDecode] = [1, 3, 5]
     preview_max_chars: int = 180
     preview_sample_text: str = (
         "This is how I sound. Give me a paragraph and I'll read the whole thing."

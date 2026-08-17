@@ -36,6 +36,45 @@ def test_named_cors_origins_are_kept():
     assert settings.cors_origins == ["https://a.example", "https://b.example"]
 
 
+# --- list settings, read the way a deployment actually sets them --------------
+
+
+@pytest.mark.parametrize(
+    ("name", "raw", "field", "expected"),
+    [
+        ("ONEREAD_ALLOWED_HOSTS", "oneread.example", "allowed_hosts", ["oneread.example"]),
+        ("ONEREAD_ALLOWED_HOSTS", "*", "allowed_hosts", ["*"]),
+        (
+            "ONEREAD_ALLOWED_HOSTS",
+            "a.example, b.example",
+            "allowed_hosts",
+            ["a.example", "b.example"],
+        ),
+        ("ONEREAD_CORS_ORIGINS", "https://a.example", "cors_origins", ["https://a.example"]),
+        ("ONEREAD_SAMPLE_MINUTE_CHOICES", "1,3,5", "sample_minute_choices", [1, 3, 5]),
+    ],
+)
+def test_comma_separated_settings_come_from_the_environment(
+    monkeypatch, name: str, raw: str, field: str, expected: list
+):
+    """The env is the only way a container is configured, so it has to work there.
+
+    These parse fine as constructor arguments and used to fail as environment
+    variables: pydantic-settings ran `json.loads` over the raw value before the
+    splitting validators saw it, so every documented form — a bare hostname, a
+    "*", a comma-separated list — raised at import and took the app down with
+    it. The constructor tests above could never have caught it.
+    """
+    monkeypatch.setenv(name, raw)
+    assert getattr(Settings(), field) == expected
+
+
+def test_the_cors_wildcard_is_still_refused_from_the_environment(monkeypatch):
+    monkeypatch.setenv("ONEREAD_CORS_ORIGINS", "*")
+    with pytest.raises(ValueError, match="can't be"):
+        Settings()
+
+
 def test_only_the_named_origin_is_answered(settings):
     settings.cors_origins = ["https://oneread.example"]
     with TestClient(create_app(settings)) as client:

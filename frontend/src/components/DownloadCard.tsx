@@ -7,9 +7,8 @@ interface Props {
 }
 
 /**
- * The files, sitting in the open next to the recording they belong to.
- * Nobody outside video work knows what an SRT is, so each row says what it's
- * for and leaves the extension as a footnote.
+ * The files, in the open beside the recording they belong to. Each row says
+ * what it's for and leaves the extension as a footnote.
  */
 export function DownloadCard({ reading }: Props) {
   const size = fileSize(reading.duration_s);

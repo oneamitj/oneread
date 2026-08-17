@@ -1,14 +1,10 @@
 """Reading a file, so its words can become an entry.
 
-Uploading and creating an entry are two steps rather than one. Extraction is
-guesswork in places — a slide deck has no obvious reading order, a PDF has no
-paragraphs — and the person who chose the file is the only one who can tell
-whether the result is right. So the words come back to the editor first, and
-nothing is saved until they press Create.
-
-That leaves the file itself waiting in `staging_dir` for as long as the editor
-is open. An `Upload` row tracks it; claiming it moves the file next to the
-entry, and anything nobody claimed is swept after a day.
+Extraction is guesswork in places — a deck has no reading order, a PDF has no
+paragraphs — so the words go back to the editor first and nothing is saved until
+Create is pressed. Meanwhile the file waits in `staging_dir` with an `Upload`
+row tracking it: claiming moves it next to the entry, and the unclaimed are
+swept after a day.
 """
 
 from __future__ import annotations
@@ -61,8 +57,8 @@ def reset_limiters() -> None:
 def _read_body(handle: UploadFile, cap: int) -> bytes:
     """Pull the file off the wire, giving up the moment it's too big.
 
-    Reading it whole and then measuring would mean a 2 GB request is held in
-    memory before being refused, which is the attack rather than the defence.
+    Reading it whole and then measuring holds a 2 GB request in memory before
+    refusing it, which is the attack rather than the defence.
     """
     chunks: list[bytes] = []
     total = 0

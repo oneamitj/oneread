@@ -286,7 +286,7 @@ def test_timestamps_leave_the_api_as_utc(client):
     ).json()
 
     for stamp in (created["created_at"], created["updated_at"]):
-        assert stamp.endswith("Z") or stamp.endswith("+00:00"), stamp
+        assert stamp.endswith(("Z", "+00:00")), stamp
         parsed = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
         assert parsed.tzinfo is not None
         # And it says the right moment, not the local wall clock in UTC clothing.

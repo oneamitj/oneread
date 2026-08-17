@@ -107,10 +107,13 @@ def _merge_stubs(sentences: list[str], limit: int) -> list[str]:
         else:
             out.append(sentence)
     # A trailing stub has nothing after it, so pull it back one.
-    if len(out) > 1 and _weight(out[-1]) < MIN_SEGMENT_WEIGHT:
-        if len(out[-2]) + len(out[-1]) + 1 <= limit:
-            tail = out.pop()
-            out[-1] = _join(out[-1], tail)
+    if (
+        len(out) > 1
+        and _weight(out[-1]) < MIN_SEGMENT_WEIGHT
+        and len(out[-2]) + len(out[-1]) + 1 <= limit
+    ):
+        tail = out.pop()
+        out[-1] = _join(out[-1], tail)
     return out
 
 

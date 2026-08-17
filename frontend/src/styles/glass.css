@@ -114,8 +114,6 @@ button, input, textarea, select { font: inherit; color: inherit; }
 
 .btn--danger:hover { background: rgba(208, 52, 44, 0.14); color: var(--bad); }
 
-.btn--icon { padding: 0.45rem; border-radius: var(--r-pill); }
-
 .field {
   width: 100%;
   padding: 0.65rem 0.85rem;

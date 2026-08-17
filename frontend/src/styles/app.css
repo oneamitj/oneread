@@ -254,9 +254,6 @@
   color: var(--ink-2);
   align-self: flex-start;
 }
-.status--ready { color: var(--good); background: rgba(31, 157, 85, 0.14); }
-.status--failed { color: var(--bad); background: rgba(208, 52, 44, 0.14); }
-
 .status__pulse {
   width: 6px;
   height: 6px;
@@ -708,68 +705,6 @@
 
 /* --- readings ----------------------------------------------------------- */
 
-.readings {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--s-3);
-}
-
-.reading {
-  padding: var(--s-3);
-  border-radius: var(--r-md);
-  background: var(--glass-thin);
-  border: 1px solid var(--hairline);
-  display: flex;
-  flex-direction: column;
-  gap: var(--s-2);
-}
-
-.reading .player {
-  background: none;
-  border: 0;
-  padding: 0;
-}
-
-.reading__head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--s-3);
-}
-
-.reading__what { font-size: 0.875rem; font-weight: 600; letter-spacing: 0.005em; }
-.reading__len { font-weight: 400; color: var(--ink-3); }
-
-.reading__running { display: flex; flex-direction: column; gap: var(--s-2); }
-
-.reading__running-foot,
-.reading__foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--s-3);
-  flex-wrap: wrap;
-  /* Pinned to the bottom, so a short card still lines up with its files. */
-  margin-top: auto;
-}
-
-.reading__links { display: flex; align-items: center; gap: var(--s-1); }
-
-.reading__links a {
-  padding: 0.25rem 0.5rem;
-  border-radius: var(--r-sm);
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: var(--ink-2);
-  text-decoration: none;
-}
-.reading__links a:hover { background: var(--accent-tint); color: var(--ink); }
-
-.status--stopped { color: var(--warn); background: rgba(178, 106, 0, 0.14); }
-
 .lockchip {
   flex: none;
   font-size: 0.6875rem;
@@ -780,48 +715,6 @@
   border-radius: var(--r-pill);
   background: rgba(178, 106, 0, 0.16);
   color: var(--warn);
-}
-
-.card.is-locked { box-shadow: var(--shadow-md), 0 0 0 1px rgba(178, 106, 0, 0.35); }
-
-/* --- the plan before a long reading ------------------------------------- */
-
-.plan { padding: var(--s-4); border-radius: var(--r-md); }
-
-.plan__head {
-  margin: 0 0 var(--s-3);
-  font-size: 0.9375rem;
-  letter-spacing: -0.005em;
-}
-
-.plan__facts {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--s-3);
-  margin: 0 0 var(--s-3);
-}
-
-.plan__facts div { min-width: 0; }
-
-.plan__facts dt {
-  font-size: 0.6875rem;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--ink-3);
-}
-
-.plan__facts dd {
-  margin: 2px 0 0;
-  font-size: 1.0625rem;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-}
-
-.plan__actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--s-2);
-  margin-top: var(--s-4);
 }
 
 .btn--small { padding: 0.35rem 0.75rem; font-size: 0.875rem; }
@@ -890,17 +783,6 @@
 }
 .page__h2 .hint { text-transform: none; letter-spacing: 0; }
 
-.page__text {
-  padding: var(--s-4);
-  border-radius: var(--r-md);
-  white-space: pre-wrap;
-  line-height: 1.7;
-  color: var(--ink-2);
-  max-height: 34rem;
-  overflow-y: auto;
-  scrollbar-width: thin;
-}
-
 @media (max-width: 40rem) {
   .page { padding-inline: var(--s-2); }
   .page__head { padding: var(--s-4); }
@@ -908,7 +790,14 @@
 
 /* --- one recording, one card -------------------------------------------- */
 
-.readings { display: flex; flex-direction: column; gap: var(--s-4); }
+.readings {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
 
 /* The recording, and the files it produced, side by side and the same height. */
 .pair {
@@ -927,6 +816,8 @@
 .reading {
   padding: var(--s-4);
   border-radius: var(--r-md);
+  background: var(--glass-thin);
+  border: 1px solid var(--hairline);
   display: flex;
   flex-direction: column;
   gap: var(--s-3);
@@ -1057,8 +948,6 @@
   border-radius: var(--r-sm);
   border: 1px solid var(--hairline);
 }
-
-.reading__foot--end { justify-content: flex-end; }
 
 /* --- the two views of the text ------------------------------------------ */
 
@@ -1422,9 +1311,8 @@
 }
 
 /* A word in a sentence that happens to do something. Identical to the text
-   around it at rest, on purpose: it's a shortcut for people who notice it,
-   not the way anyone is meant to find the editor. The underline on hover and
-   the focus ring are what make it discoverable and reachable by keyboard. */
+   around it at rest; the hover underline and focus ring are what make it
+   discoverable and reachable by keyboard. */
 .inlink {
   border: 0;
   background: none;
@@ -1471,9 +1359,8 @@
   min-width: 0;
 }
 
-/* Identity and download in one control: it says which document this came out
-   of, and pressing it hands you that document. A separate card for the same
-   two facts was a card's worth of furniture for a line's worth of content. */
+/* Identity and download in one control: which document this came out of, and
+   pressing it hands you that document. */
 .filepill {
   display: inline-flex;
   align-items: center;
@@ -1523,8 +1410,7 @@
 
 .filepill:hover .filepill__type { color: inherit; }
 
-/* Faint but always there. Hidden until hover, the pill reads as a label and
-   nobody discovers that pressing it hands them the file. */
+/* Faint but always there: hidden until hover, the pill reads as a label. */
 .filepill__down { flex: none; opacity: 0.45; transition: opacity var(--t-fast) var(--ease-out); }
 .filepill:hover .filepill__down,
 .filepill:focus-visible .filepill__down { opacity: 1; }
@@ -1542,10 +1428,9 @@
 
 /* --- the analytics question --------------------------------------------- */
 
-/* A bar on the bottom edge rather than a card floating above it: one row of
-   furniture, so it costs the library one row of height and reads as part of
-   the window chrome. Under the editor's layer (50), not over it — a sheet is
-   work in progress and this can wait until it closes. */
+/* A bar on the bottom edge rather than a floating card: one row of height,
+   read as window chrome. Under the editor's layer (50) — a sheet is work in
+   progress and this can wait until it closes. */
 .consent {
   position: fixed;
   z-index: 40;
@@ -1584,8 +1469,7 @@
 .consent__acts { display: flex; gap: var(--s-2); flex: none; }
 .consent__acts .btn { padding: 0.35rem 0.75rem; font-size: 0.875rem; }
 
-/* Where one row genuinely can't hold it, the text wraps above the buttons —
-   still the shortest thing that fits, not a card. */
+/* Where one row can't hold it, the text wraps above the buttons. */
 @media (max-width: 44rem) {
   .consent { flex-wrap: wrap; justify-content: flex-end; gap: var(--s-2) var(--s-3); }
   .consent__copy { flex: 1 1 100%; }

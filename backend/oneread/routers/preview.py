@@ -14,9 +14,15 @@ from ..auth import CurrentUser, require_csrf
 from ..config import Settings, get_settings
 from ..markdown_speech import DEFAULT_FORMAT, FORMATS, to_speech
 from ..ratelimit import RateLimiter, enforce
-from ..schemas import MAX_SPEED, MIN_SPEED
 from ..segmenter import segment_text
-from ..tts_engine import VOICE_IDS, SynthesisError, TTSEngine, get_engine
+from ..tts_engine import (
+    MAX_SPEED,
+    MIN_SPEED,
+    VOICE_IDS,
+    SynthesisError,
+    TTSEngine,
+    get_engine,
+)
 
 log = logging.getLogger("oneread.preview")
 
@@ -89,9 +95,8 @@ class PreviewIn(BaseModel):
 def check_length(text: str, settings: Settings) -> None:
     """Refuse an oversized body before flattening and segmenting it.
 
-    Both routes below reduce whatever arrives to a single sentence, but they get
-    there by normalising, parsing and segmenting the whole thing first. Without a
-    ceiling that work is unbounded, which makes a cheap route an expensive one.
+    Both routes below end at one sentence, but they parse and segment the whole
+    body to get there. Without a ceiling that work is unbounded.
     """
     if len(text) > settings.max_text_chars:
         raise HTTPException(
@@ -192,10 +197,9 @@ def spoken_text(
 ) -> SpokenText:
     """What the reader will actually say. No synthesis, so it's cheap to call.
 
-    Cheap, not free: flattening markdown and normalising it is a parse over up
-    to `max_text_chars`, and there is one process serving everybody. So it is
-    metered like the rest, just far more loosely — the editor calls this while
-    somebody types.
+    Cheap, not free: flattening markdown is a parse over up to
+    `max_text_chars`, against one process. Metered like the rest, just loosely —
+    the editor calls this while somebody types.
     """
     enforce(limiter, user.id, "That's a lot of requests at once. Give it a moment.")
     check_length(payload.text, settings)

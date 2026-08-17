@@ -27,7 +27,6 @@
   --ink: #16161a;
   --ink-2: rgba(22, 22, 26, 0.66);
   --ink-3: rgba(22, 22, 26, 0.42);
-  --ink-inverse: #ffffff;
 
   /* Accent: a warm blue that reads as "press play". */
   --accent: #0a72f5;
@@ -79,7 +78,6 @@
     --ink: #f4f5f8;
     --ink-2: rgba(244, 245, 248, 0.68);
     --ink-3: rgba(244, 245, 248, 0.44);
-    --ink-inverse: #101116;
 
     --accent: #4c9dff;
     --accent-strong: #74b4ff;

@@ -63,9 +63,9 @@ def generate_limiter(settings: Annotated[Settings, Depends(get_settings)]) -> Ra
 def text_limiter(settings: Annotated[Settings, Depends(get_settings)]) -> RateLimiter:
     """For the routes that measure a document rather than read it.
 
-    `segments` and `estimate` make no audio, so neither is held to the hourly
-    generation limit — but both segment up to `max_text_chars` on every call,
-    against one process. Loose enough that dragging the range picker is fine.
+    `segments` and `estimate` make no audio, so they escape the hourly
+    generation limit — but both segment up to `max_text_chars` against one
+    process. Loose enough that dragging the range picker is fine.
     """
     global _text_limiter
     if _text_limiter is None:
@@ -416,9 +416,9 @@ def create_entry(
 ) -> EntryOut:
     """Create the entry and read the first few minutes of it.
 
-    Reading a book takes half an hour, and most of the time what you want to
-    know first is whether the voice is right. So creation always makes a sample;
-    the full reading is a second, deliberate press.
+    Reading a book takes half an hour, and the first question is usually whether
+    the voice is right. So creation always makes a sample; the full reading is a
+    second, deliberate press.
     """
     _check_length(payload.body, settings)
     _check_queue_room(session, user.id, settings, limiter)
@@ -494,7 +494,7 @@ def update_entry(
     if changed:
         # The old readings are still playable, but they're of the old text, so a
         # fresh sample goes in the queue the way it does on creation.
-        _cancel_live(session, entry_id, worker)
+        _cancel_live(session, entry_id)
         _queue_reading(
             session, entry, scope="sample", minutes=payload.sample_minutes,
             settings=settings, worker=worker,
@@ -503,8 +503,8 @@ def update_entry(
     return _detail(session, entry)
 
 
-def _cancel_live(session: Session, entry_id: str, worker: Worker) -> None:
-    del worker  # the worker notices the flag on its next sentence
+def _cancel_live(session: Session, entry_id: str) -> None:
+    """Flag the live readings. The worker notices between sentences."""
     for rendition in session.scalars(
         select(Rendition).where(
             Rendition.entry_id == entry_id, Rendition.status.in_(LIVE_STATUSES)

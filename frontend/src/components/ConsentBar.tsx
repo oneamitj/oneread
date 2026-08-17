@@ -1,9 +1,8 @@
 import { setConsent, useConsent } from "../analytics/consent";
 
 /**
- * The one time the app asks for something for its own benefit rather than the
- * reader's. So it says plainly what is collected, offers both answers as equal
- * buttons, and doesn't come back once either one is pressed.
+ * The one thing the app asks for its own benefit, so: plain words about what is
+ * collected, both answers as equal buttons, and no second asking.
  */
 export function ConsentBar() {
   const choice = useConsent();

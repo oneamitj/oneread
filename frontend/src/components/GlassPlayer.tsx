@@ -1,17 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError, audioUrl } from "../api";
 import { clock } from "../format";
+import { PauseGlyph, PlayGlyph } from "./Glyphs";
 import type { Cue } from "../types";
 
 interface Props {
   renditionId: string;
   title: string;
   duration: number;
-  /** Lines exist, but they're only fetched if someone opens the transcript. */
-  hasCues: boolean;
 }
 
-export function GlassPlayer({ renditionId, title, duration, hasCues }: Props) {
+export function GlassPlayer({ renditionId, title, duration }: Props) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLOListElement>(null);
@@ -170,16 +169,14 @@ export function GlassPlayer({ renditionId, title, duration, hasCues }: Props) {
           </div>
         </div>
 
-        {hasCues ? (
-          <button
-            type="button"
-            className="btn btn--quiet player__toggle"
-            onClick={() => setShowTranscript((open) => !open)}
-            aria-expanded={showTranscript}
-          >
-            {showTranscript ? "Hide words" : "Follow along"}
-          </button>
-        ) : null}
+        <button
+          type="button"
+          className="btn btn--quiet player__toggle"
+          onClick={() => setShowTranscript((open) => !open)}
+          aria-expanded={showTranscript}
+        >
+          {showTranscript ? "Hide words" : "Follow along"}
+        </button>
       </div>
 
       {showTranscript ? (
@@ -205,21 +202,5 @@ export function GlassPlayer({ renditionId, title, duration, hasCues }: Props) {
         )
       ) : null}
     </div>
-  );
-}
-
-function PlayGlyph() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true">
-      <path d="M5 3.2v11.6L14.4 9 5 3.2z" fill="currentColor" />
-    </svg>
-  );
-}
-
-function PauseGlyph() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 18 18" aria-hidden="true">
-      <path d="M5 3.5h3.1v11H5zM9.9 3.5H13v11H9.9z" fill="currentColor" />
-    </svg>
   );
 }

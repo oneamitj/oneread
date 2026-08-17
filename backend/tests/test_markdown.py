@@ -86,10 +86,6 @@ def test_code_fences_are_announced_not_dictated():
     assert speak("```\nsome code\n```") == ["Code block, 1 line."]
 
 
-def test_code_can_be_read_out_when_asked():
-    assert speak("```\nls -la\n```", speak_code=True) == ["ls -la."]
-
-
 def test_horizontal_rules_are_silent():
     assert speak("Before.\n\n---\n\nAfter.") == ["Before.", "After."]
 

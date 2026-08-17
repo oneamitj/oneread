@@ -109,11 +109,6 @@ def open_session(request: Request, settings: Settings) -> SessionCookie | None:
     )
 
 
-def read_session(request: Request, settings: Settings) -> str | None:
-    cookie = open_session(request, settings)
-    return cookie.uid if cookie is not None else None
-
-
 def current_user(
     request: Request,
     session: Annotated[Session, Depends(get_session)],

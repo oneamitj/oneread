@@ -85,7 +85,6 @@ export function ReadingCard({ entryTitle, reading, onStop, onDelete }: Props) {
           renditionId={reading.id}
           title={entryTitle}
           duration={reading.duration_s ?? 0}
-          hasCues
         />
       ) : null}
 

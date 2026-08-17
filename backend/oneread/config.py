@@ -11,18 +11,12 @@ from typing import Annotated
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
-#: A list setting that is written as a comma-separated string rather than JSON.
+#: A list setting written as a comma-separated string rather than JSON.
 #:
-#: pydantic-settings decodes any list-typed field from the environment by
-#: running `json.loads` over the raw value, and it does that *before* a
-#: `mode="before"` validator ever sees it. So `ONEREAD_ALLOWED_HOSTS=example.com`
-#: — and `=*`, and `ONEREAD_SAMPLE_MINUTE_CHOICES=1,3,5` — didn't fall back to
-#: the splitters below. They raised `SettingsError` at import and the app never
-#: started, which is a poor way to find out that a setting the README documents
-#: has never worked from the environment.
-#:
-#: `NoDecode` turns that decoding off for the field, leaving the string for
-#: `_split_csv` / `_split_ints` to handle.
+#: pydantic-settings runs `json.loads` over any list-typed field before a
+#: `mode="before"` validator sees it, so `ONEREAD_ALLOWED_HOSTS=example.com`
+#: would raise `SettingsError` at import. `NoDecode` turns that off and leaves
+#: the string to `_split_csv` / `_split_ints`.
 CommaSeparated = Annotated[list[str], NoDecode]
 
 
@@ -132,17 +126,11 @@ class Settings(BaseSettings):
     def _no_wildcard_origin(cls, value: list[str]) -> list[str]:
         """Refuse "*", because the app sends cookies cross-origin.
 
-        Starlette treats `allow_origins=["*"]` together with
-        `allow_credentials=True` as "reflect whichever Origin asked", so the
-        answer carries `Access-Control-Allow-Credentials: true` for any site on
-        the internet. That hands every page a signed-in reader visits their whole
-        library, and it also lifts the one thing standing in front of writes: the
-        `X-Requested-With` check works because a cross-site request can't set
-        that header without a preflight that fails. An allowed origin's preflight
-        doesn't fail.
-
-        So the wildcard is a mistake rather than a setting, and it stops the app
-        from starting instead of quietly turning the same-origin policy off.
+        Starlette reads `allow_origins=["*"]` with `allow_credentials=True` as
+        "reflect whichever Origin asked", so any site would get
+        `Access-Control-Allow-Credentials: true` — every signed-in reader's
+        library, plus a passing preflight that lifts the `X-Requested-With`
+        CSRF check. A mistake, not a setting, so the app refuses to start.
         """
         if "*" in value:
             raise ValueError(
@@ -196,10 +184,8 @@ def prepare(settings: Settings) -> Settings:
 def _stored_secret(data_dir: Path) -> str:
     """Read the signing key from the data directory, making one if it's absent.
 
-    Without this a restart would invent a new key, every session cookie signed
-    with the old one would stop verifying, and everybody would be asked to sign
-    in again. Setting ONEREAD_SECRET_KEY takes precedence and this file is never
-    touched.
+    Without this a restart invents a new key and invalidates every session
+    cookie. ONEREAD_SECRET_KEY takes precedence; the file is then never touched.
     """
     path = data_dir / "secret.key"
     try:
@@ -209,15 +195,10 @@ def _stored_secret(data_dir: Path) -> str:
     except FileNotFoundError:
         pass
 
-    # Created at 0600 rather than created and then narrowed: `write_text` opens
-    # the file under the process umask, which is usually 0644, so a chmod
-    # afterwards leaves a window where any local account can read the key — and
-    # the key is enough to sign a cookie naming any user.
-    #
-    # O_EXCL settles the other race too. Two workers starting together can both
-    # find no file and both make a key; whoever creates it wins, and the loser
-    # reads what the winner wrote instead of overwriting it. Without that, half
-    # the workers would be signing with a key the other half rejects.
+    # Created at 0600 rather than chmod'ed afterwards: `write_text` opens under
+    # the umask, leaving a window where any local account can read a key that
+    # signs a cookie for any user. O_EXCL settles the other race — two workers
+    # starting together, the loser reading what the winner wrote.
     key = secrets.token_urlsafe(48)
     try:
         handle = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)

@@ -90,17 +90,14 @@ def client_ip(request: Request) -> str:
 def peer_ip(request: Request) -> str:
     """The address the connection came from, as far as the server is told.
 
-    Worth counting against, because spoofing `X-Forwarded-For` gives a fresh
-    `client_ip` every request and so a fresh bucket every time. Behind a proxy
-    every visitor shares one of these, which is why the peer allowance is a
-    multiple of the per-client one.
+    Worth counting against: spoofing `X-Forwarded-For` gives a fresh
+    `client_ip` every request. Behind a proxy every visitor shares one of these,
+    hence the peer allowance being a multiple of the per-client one.
 
-    One caveat, and it is the reason the username limit below exists: uvicorn
-    rewrites this from `X-Forwarded-For` by default whenever the real peer is one
-    it trusts, and it trusts loopback out of the box. Run it with
-    `--no-proxy-headers` (as the Dockerfile and Makefile do) and this is the
-    genuine address; leave the default and a caller on the same host can move it
-    at will. So it is a useful key, not a trustworthy one.
+    Not trustworthy though, which is why the username limit exists: uvicorn
+    rewrites this from `X-Forwarded-For` whenever it trusts the peer, and it
+    trusts loopback by default. `--no-proxy-headers` (Dockerfile and Makefile)
+    keeps it genuine.
     """
     return request.client.host if request.client else "unknown"
 

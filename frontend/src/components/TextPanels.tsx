@@ -13,10 +13,9 @@ interface Props {
 type Which = "spoken" | "source";
 
 /**
- * Two views of the same entry: what you started with, and what the voice made
- * of it. For markdown, and for anything that arrived as a file, those are very
- * different documents, and the second one is the only way to check a table or
- * a code fence landed the way you wanted.
+ * Two views of the same entry: what you started with, and what the voice made of
+ * it. For markdown and for files those differ, and the second is the only way to
+ * check a table or a code fence landed right.
  */
 export function TextPanels({ entry, onEdit }: Props) {
   const markdown = entry.format === "markdown";
@@ -107,8 +106,7 @@ export function TextPanels({ entry, onEdit }: Props) {
             {entry.locked ? (
               "Edit it"
             ) : (
-              // Reads as ordinary prose until you point at it. The word already
-              // told you what it does, so dressing it up would only repeat that.
+              // Ordinary prose until you point at it: the word says what it does.
               <button type="button" className="inlink" onClick={onEdit}>
                 Edit it
               </button>

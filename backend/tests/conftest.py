@@ -38,10 +38,6 @@ class FakeEngine(TTSEngine):
     def load(self) -> None:  # pragma: no cover - nothing to load
         pass
 
-    @property
-    def sample_rate(self) -> int:
-        return SAMPLE_RATE
-
     def languages(self) -> list[str]:
         return ["en", "ko", "na"]
 
@@ -145,7 +141,6 @@ class FakeEngine(TTSEngine):
         return Synthesis(
             duration_s=round(cursor, 3),
             cues=cues,
-            sample_rate=SAMPLE_RATE,
             segments_done=done,
             segments_total=len(segments),
             spoken_chars=spoken_chars,

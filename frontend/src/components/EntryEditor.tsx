@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../api";
+import { languageOptions } from "../languages";
 import type { Entry, EntryDraft, Meta, TextFormat, Upload } from "../types";
 import { FileDrop } from "./FileDrop";
 import { SpokenPreview } from "./SpokenPreview";
@@ -21,17 +22,6 @@ const FORMAT_CHOICES: { id: TextFormat; label: string }[] = [
   { id: "markdown", label: "Markdown" },
 ];
 
-const LANGUAGE_NAMES = new Intl.DisplayNames(["en"], { type: "language" });
-
-function languageLabel(code: string): string {
-  if (code === "na") return "Work it out for me";
-  try {
-    return LANGUAGE_NAMES.of(code) ?? code;
-  } catch {
-    return code;
-  }
-}
-
 export function EntryEditor({
   meta, entry, knownTags, busy, error, onSave, onClose,
 }: Props) {
@@ -44,9 +34,8 @@ export function EntryEditor({
   const [speed, setSpeed] = useState(entry?.speed ?? meta.default_speed);
   const [sampleMinutes, setSampleMinutes] = useState(meta.sample_minutes);
   const [upload, setUpload] = useState<Upload | null>(null);
-  // What the box held before a file replaced it. Offered back as an undo, and
-  // forgotten when the sheet closes — a dropped file shouldn't quietly destroy
-  // twenty minutes of typing.
+  // What the box held before a file replaced it, offered back as an undo so a
+  // drop can't quietly destroy twenty minutes of typing.
   const [replaced, setReplaced] = useState<{ title: string; body: string; format: TextFormat } | null>(null);
   const titleRef = useRef<HTMLInputElement>(null);
 
@@ -66,13 +55,7 @@ export function EntryEditor({
     return () => window.removeEventListener("keydown", onEscape);
   }, [close]);
 
-  const languages = useMemo(() => {
-    const rest = meta.languages
-      .filter((code) => code !== "na")
-      .map((code) => ({ code, label: languageLabel(code) }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-    return [{ code: "na", label: languageLabel("na") }, ...rest];
-  }, [meta.languages]);
+  const languages = useMemo(() => languageOptions(meta.languages), [meta.languages]);
 
   const over = body.length - meta.max_text_chars;
   const canSave = title.trim().length > 0 && body.trim().length > 0 && over <= 0 && !busy;

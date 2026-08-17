@@ -53,7 +53,7 @@ const HAS_OFFSET = /(?:Z|[+-]\d{2}:?\d{2})$/;
  * offset; anything that somehow doesn't is still UTC, and must not be read as
  * local time or the whole clock shifts.
  */
-export function parseUtc(iso: string): number {
+function parseUtc(iso: string): number {
   return Date.parse(HAS_OFFSET.test(iso) ? iso : `${iso}Z`);
 }
 

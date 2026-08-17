@@ -220,11 +220,9 @@ class Worker:
             self._fail(rendition_id, str(exc))
             return
         except Exception:
-            # An unplanned failure says whatever the library it came from felt
-            # like saying, which tends to be a file path or an internal name.
-            # `rendition.error` is shown in the interface, so the traceback stays
-            # in the log — where it is more use anyway — and the reader gets a
-            # sentence. `SynthesisError` above is the case we do have words for.
+            # `rendition.error` is shown in the interface, and a library's own
+            # message tends to be a file path or an internal name. So the
+            # traceback goes to the log and the reader gets a sentence.
             log.exception("synthesis blew up for rendition %s", rendition_id)
             self._fail(
                 rendition_id,

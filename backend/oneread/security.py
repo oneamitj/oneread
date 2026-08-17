@@ -36,16 +36,12 @@ _UNSAFE_IN_FILENAME = re.compile(r"[^A-Za-z0-9._-]")
 
 
 def content_disposition(filename: str, *, fallback: str = "download") -> str:
-    """An attachment header that survives whatever the name turns out to contain.
+    """An attachment header that survives whatever the name contains.
 
-    Filenames come from uploads and entry titles, so they arrive holding quotes,
-    semicolons and anything else a person can type. Interpolated straight into
-    the header, a quote ends the quoted string early and the rest of the name
-    becomes parameters — the browser then saves the file under a truncated name.
-
-    So the quoted form is reduced to characters that can't do that, and the
-    original is carried alongside in the RFC 5987 form when the two differ.
-    A name that was already plain comes back exactly as it went in.
+    Names come from uploads and entry titles, so a quote or semicolon can end
+    the quoted string early and truncate the saved filename. The quoted form is
+    reduced to safe characters; the original rides along in RFC 5987 form when
+    the two differ.
     """
     safe = _UNSAFE_IN_FILENAME.sub("_", filename).strip("._") or fallback
     header = f'attachment; filename="{safe}"'
@@ -57,14 +53,11 @@ def content_disposition(filename: str, *, fallback: str = "download") -> str:
 class BodyLimitMiddleware:
     """Refuse a request body past `limit` bytes, before anything buffers it.
 
-    Uploads are read in chunks and cut off at their own ceiling, but a JSON body
-    is parsed whole before any route sees it, so `max_text_chars` is checked only
-    once the megabytes are already in memory. This is raw ASGI rather than
-    `BaseHTTPMiddleware` on purpose: the latter reads the body itself, which is
-    the thing being guarded against.
-
-    `Content-Length` is honoured where it's given and counted where it isn't, so
-    a chunked request can't slip past by leaving the header off.
+    A JSON body is parsed whole before any route sees it, so `max_text_chars`
+    would only be checked once the megabytes are in memory. Raw ASGI rather than
+    `BaseHTTPMiddleware`, which reads the body itself. `Content-Length` is
+    honoured where given and counted where it isn't, so a chunked request can't
+    slip past by leaving the header off.
     """
 
     def __init__(self, app: ASGIApp, *, limit: int, upload_limit: int) -> None:
@@ -114,13 +107,11 @@ class BodyLimitMiddleware:
 
 
 class _Sender:
-    """Passes responses through, unless the body was refused while one was forming.
+    """Passes responses through, unless the body was refused mid-response.
 
-    A truncated body makes the route below fail in its own way — a parse error,
-    a disconnect — and answer accordingly. That answer is wrong twice over: wrong
-    status, and shaped by whichever layer produced it rather than by this app's
-    one error contract. So once the limit is passed, whatever it was about to say
-    is dropped on the floor and `_too_large` speaks instead.
+    A truncated body makes the route fail in its own way — a parse error, a
+    disconnect — with the wrong status and the wrong error shape. Past the
+    limit, that answer is dropped and `_too_large` speaks instead.
     """
 
     def __init__(self, send: Send, refused: Callable[[], bool]) -> None:

@@ -1,17 +1,13 @@
 """Turning an uploaded file into words a voice can read.
 
-Everything a document format knows lives here, and nothing else does: no
-FastAPI, no database, no settings object. Hand it bytes and a filename, get
-back text.
+Every document format lives here and nothing else does: no FastAPI, no
+database, no settings object. Bytes and a filename in, text out.
 
-Two things shape the whole module. The first is that the output is *spoken*,
-not displayed, so layout fidelity is worthless and sentence shape is
-everything. A spreadsheet read cell by cell is noise; the same spreadsheet read
-as "Row 1. Region: North. Units: 412." is a sentence. The second is that these
-files arrive from strangers. Office and OpenDocument files are zip containers
-full of XML, which is a well-known way to hand a server a small file that
-becomes a large one, so nothing reaches a parser before `_guard_zip` has looked
-at it.
+Two things shape it. The output is spoken, not displayed, so layout fidelity is
+worthless and sentence shape is everything — a spreadsheet read cell by cell is
+noise, "Row 1. Region: North. Units: 412." is a sentence. And the files come
+from strangers: Office and OpenDocument files are zips of XML, so nothing
+reaches a parser before `_guard_zip` has looked at it.
 """
 
 from __future__ import annotations
@@ -203,10 +199,9 @@ def _looks_like_header(row: list[str]) -> bool:
 def _grid(rows: Iterable[list[object]], build: _Builder, *, name: str = "") -> None:
     """Read a grid as sentences.
 
-    The alternative is joining cells with commas, which is how a spreadsheet
-    becomes forty minutes of numbers with no idea which column they came from.
-    Naming the column before each value costs a few words and makes the
-    recording usable.
+    Joining cells with commas turns a spreadsheet into forty minutes of numbers
+    with no idea which column they came from. Naming the column before each
+    value costs a few words and makes the recording usable.
     """
     header: list[str] | None = None
     count = 0
@@ -293,23 +288,18 @@ def _oversized(unpacked: int, packed: int, max_unzipped: int) -> bool:
 def _guard_zip(data: bytes, job: _Job) -> None:
     """Look over a zip container before any parser opens it.
 
-    docx, pptx, xlsx and the OpenDocument formats are all zips of XML. Two
-    cheap attacks live there: a small archive that expands to fill the disk,
-    and an XML entity declaration that expands inside the parser instead.
+    docx, pptx, xlsx and the OpenDocument formats are zips of XML, which brings
+    two cheap attacks: an archive that expands to fill the disk, and an XML
+    entity declaration that expands inside the parser.
 
-    The sizes in a zip's own headers are written by whoever built it, so they
-    are a claim rather than a measurement: an archive can declare a hundred
-    bytes and hold four hundred megabytes. So the declared numbers are only a
-    fast reject, and every member is then read through in chunks and counted
-    for real. That costs one bounded pass — `read` hands back at most a chunk
-    at a time, and a member that outruns its own declared size is refused on
-    the first one, long before a parser sees it.
+    A zip's declared sizes are a claim, not a measurement, so they only serve as
+    a fast reject; every member is then read in chunks and counted for real. One
+    bounded pass, and a member outrunning its declared size is refused on the
+    first chunk.
 
-    The entity check is defence in depth rather than the only line: python-docx
-    and python-pptx both build their parser with `resolve_entities=False`, and
-    odfpy parses through `defusedxml.sax`. It stays because it is nearly free
-    once the bytes are already going past, and because a declaration is a
-    reasonable thing to refuse outright.
+    The entity check is defence in depth — python-docx and python-pptx parse
+    with `resolve_entities=False` and odfpy through `defusedxml.sax` — kept
+    because it is nearly free once the bytes are going past anyway.
     """
     try:
         with zipfile.ZipFile(io.BytesIO(data)) as bundle:
@@ -711,10 +701,9 @@ def _odf_rows(table) -> Iterator[list[str]]:
 def _read_legacy(data: bytes, build: _Builder, job: _Job) -> str:
     """The 1990s Office formats, by way of LibreOffice if it's installed.
 
-    There is no pure-Python reader for .doc or .ppt worth relying on, and
-    pulling four hundred megabytes of office suite into the image for two rare
-    formats isn't a fair default. So it's used when it's there and explained
-    when it isn't.
+    No pure-Python reader for .doc or .ppt is worth relying on, and 400 MB of
+    office suite in the image for two rare formats isn't a fair default. So it
+    is used when present and explained when absent.
     """
     soffice = job.soffice or shutil.which("soffice") or shutil.which("libreoffice")
     modern = {".doc": "docx", ".ppt": "pptx", ".xls": "xlsx"}

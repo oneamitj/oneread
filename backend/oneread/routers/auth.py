@@ -92,14 +92,10 @@ def login(
     def refuse() -> HTTPException:
         """Turn one attempt away, and count it against the user id it named.
 
-        Only wrong answers reach here, and the limit is consulted only when one
-        does — so someone typing their own password correctly is never held up by
-        the guesses other people have been making at their account. Past the
-        limit the answer becomes 429 rather than another 401, and stays that way
-        until the bucket refills.
-
-        The password check above it costs real time by design, so the two address
-        limits are what keep that work bounded; this bounds the guessing itself.
+        Only wrong answers reach here, so a correct password is never held up by
+        other people's guesses at the same account. Past the limit the answer
+        becomes 429 until the bucket refills. The address limits bound the cost
+        of the password check; this bounds the guessing.
         """
         if not failure_limiter.check(payload.username):
             return HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, too_many)
@@ -159,11 +155,9 @@ def revoke_sessions(
 ) -> Response:
     """Sign out all sessions.
 
-    Signing out normally only clears the cookie in the browser doing it, which is
-    the right thing when you're closing one tab and no help at all when a laptop
-    has gone missing. Raising the token version leaves every cookie ever issued
-    for this account failing its check — so a fresh one is issued here, and this
-    device stays signed in while the rest are turned away.
+    A normal sign-out clears one browser's cookie, which is no help when a
+    laptop goes missing. Raising the token version fails every cookie ever
+    issued for the account; a fresh one is issued here so this device stays in.
     """
     user.token_version += 1
     session.commit()

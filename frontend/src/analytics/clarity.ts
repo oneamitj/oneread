@@ -1,9 +1,8 @@
 /** Microsoft Clarity, loaded once for the whole app.
 
-The vendor snippet is normally an inline `<script>` in `index.html`, which the
-app's CSP refuses (`script-src 'self'`, no `unsafe-inline`). The same work done
-from a module keeps the policy tight: the only concession is the clarity.ms
-origin, which the tag needs whichever way it gets on the page.
+The vendor snippet is an inline `<script>`, which the CSP refuses
+(`script-src 'self'`). Doing the same work from a module keeps the policy tight:
+the only concession is the clarity.ms origin, which the tag needs regardless.
 */
 
 type Clarity = {

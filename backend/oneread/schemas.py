@@ -13,8 +13,6 @@ from .markdown_speech import DEFAULT_FORMAT, FORMATS
 from .models import SCOPES
 from .tts_engine import MAX_SPEED, MIN_SPEED, VOICE_IDS
 
-__all__ = ["MAX_SPEED", "MIN_SPEED"]
-
 MAX_TAGS = 12
 MAX_TAG_LEN = 32
 

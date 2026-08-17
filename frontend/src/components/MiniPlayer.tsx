@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { audioUrl } from "../api";
 import { clock } from "../format";
+import { PauseGlyph, PlayGlyph } from "./Glyphs";
 
 interface Props {
   renditionId: string;
@@ -51,7 +52,7 @@ export function MiniPlayer({ renditionId, title, duration }: Props) {
           else audio.pause();
         }}
       >
-        {playing ? <PauseGlyph /> : <PlayGlyph />}
+        {playing ? <PauseGlyph size={14} /> : <PlayGlyph size={14} />}
       </button>
       <div className="mini__line" aria-hidden="true">
         <div className="mini__fill" style={{ transform: `scaleX(${progress})` }} />
@@ -60,21 +61,5 @@ export function MiniPlayer({ renditionId, title, duration }: Props) {
         {playing || time > 0 ? clock(time) : clock(duration)}
       </span>
     </div>
-  );
-}
-
-function PlayGlyph() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 18 18" aria-hidden="true">
-      <path d="M5 3.2v11.6L14.4 9 5 3.2z" fill="currentColor" />
-    </svg>
-  );
-}
-
-function PauseGlyph() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 18 18" aria-hidden="true">
-      <path d="M5 3.5h3.1v11H5zM9.9 3.5H13v11H9.9z" fill="currentColor" />
-    </svg>
   );
 }

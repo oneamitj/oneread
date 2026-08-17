@@ -1,12 +1,11 @@
 /** Whether the reader has agreed to analytics, and what follows from that.
 
-Clarity records sessions and sets its own cookies, so the tag is not fetched at
-all until someone says yes. That's the point of loading it from a module: an
-inline snippet in `index.html` runs before anyone has been asked.
+Clarity records sessions and sets cookies, so the tag isn't fetched until
+someone says yes — which is why it loads from a module rather than an inline
+snippet in `index.html`, which would run before anyone was asked.
 
-Withdrawal has to be as easy as consent, so the choice is a stored value that
-can go back to "denied" from the account menu, and doing so stops the recorder
-and clears what it left behind.
+Withdrawal is as easy as consent: the choice is stored, can go back to "denied"
+from the account menu, and doing so stops the recorder and clears its cookies.
 */
 
 import { useSyncExternalStore } from "react";

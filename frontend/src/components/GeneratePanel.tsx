@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, ApiError } from "../api";
 import { spell } from "../format";
+import { languageOptions } from "../languages";
 import type { Entry, Estimate, Meta, ReadingRequest, Scope, SegmentList } from "../types";
 import { RangePicker } from "./RangePicker";
 import { VoicePreview } from "./VoicePreview";
@@ -18,17 +19,6 @@ const MODES: { id: Scope; label: string; blurb: string }[] = [
   { id: "range", label: "A section", blurb: "Pick where it starts and stops." },
   { id: "full", label: "Everything", blurb: "The document end to end." },
 ];
-
-const LANGUAGE_NAMES = new Intl.DisplayNames(["en"], { type: "language" });
-
-function languageLabel(code: string): string {
-  if (code === "na") return "Work it out for me";
-  try {
-    return LANGUAGE_NAMES.of(code) ?? code;
-  } catch {
-    return code;
-  }
-}
 
 export function GeneratePanel({ entry, meta, onStart, onCancel, starting }: Props) {
   // A taster first: it is the cheap answer to "is this voice right?"
@@ -89,13 +79,7 @@ export function GeneratePanel({ entry, meta, onStart, onCancel, starting }: Prop
     return () => { cancelled = true; window.clearTimeout(timer); };
   }, [entry.id, plan, mode, range]);
 
-  const languages = useMemo(() => {
-    const rest = meta.languages
-      .filter((code) => code !== "na")
-      .map((code) => ({ code, label: languageLabel(code) }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-    return [{ code: "na", label: languageLabel("na") }, ...rest];
-  }, [meta.languages]);
+  const languages = useMemo(() => languageOptions(meta.languages), [meta.languages]);
 
   const ready = Boolean(estimate) && (mode !== "range" || Boolean(range));
 

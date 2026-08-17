@@ -60,7 +60,6 @@ StopHook = Callable[[], str | None]
 class Synthesis:
     duration_s: float
     cues: list[dict]
-    sample_rate: int
     segments_done: int = 0
     segments_total: int = 0
     spoken_chars: int = 0
@@ -105,10 +104,6 @@ class TTSEngine:
             self.load()
         return self._tts
 
-    @property
-    def sample_rate(self) -> int:
-        return int(self.tts.sample_rate)
-
     def languages(self) -> list[str]:
         from supertonic.config import AVAILABLE_LANGUAGES
 
@@ -148,19 +143,16 @@ class TTSEngine:
         """Speak `text` into `out_path` and report where each sentence lands.
 
         `TTS.synthesize` throws away per-chunk timings, so this walks the
-        segments itself and calls the model directly. Cue boundaries then come
-        from the sample count of the audio actually written, not from the
-        duration predictor, which is what keeps subtitles in step with speech.
+        segments and calls the model directly. Cue boundaries come from the
+        sample count of the audio written rather than the duration predictor,
+        which is what keeps subtitles in step with speech.
 
-        Audio goes to disk a sentence at a time. A book-length entry is hours of
-        samples, and holding those in a list to concatenate at the end would cost
-        gigabytes; streaming keeps memory flat however long the document is, and
-        it means a reading that stops early still leaves a playable file.
+        Audio goes to disk a sentence at a time: memory stays flat however long
+        the document is, and a reading that stops early leaves a playable file.
 
-        `limit_s` stops once that many seconds of audio exist, which is how the
-        first few minutes get made without reading the whole book.
-        `start_segment` and `end_segment` read a slice of it instead, counted in
-        sentences so a range always begins and ends on a whole one.
+        `limit_s` stops once that many seconds exist. `start_segment` and
+        `end_segment` read a slice instead, counted in sentences so a range
+        begins and ends on a whole one.
         """
         text = text.strip()
         if not text:
@@ -255,9 +247,6 @@ class TTSEngine:
 
                     if on_progress is not None:
                         on_progress(done, len(segments), end)
-        except Cancelled:
-            tmp_path.unlink(missing_ok=True)
-            raise
         except BaseException:
             tmp_path.unlink(missing_ok=True)
             raise
@@ -272,7 +261,6 @@ class TTSEngine:
         return Synthesis(
             duration_s=round(cursor / tts.sample_rate, 3),
             cues=cues,
-            sample_rate=int(tts.sample_rate),
             segments_done=done,
             segments_total=len(segments),
             spoken_chars=spoken_chars,

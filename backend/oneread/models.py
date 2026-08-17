@@ -124,7 +124,6 @@ class Entry(Base):
 # covers the first few minutes; a "full" one goes to the end. Stopping either
 # one keeps whatever was read up to that point, so the work isn't wasted.
 SCOPES = ("sample", "range", "full")
-STATUSES = ("pending", "processing", "ready", "stopped", "failed")
 LIVE_STATUSES = ("pending", "processing")
 
 
@@ -191,11 +190,9 @@ class Rendition(Base):
 class Upload(Base):
     """A file that has been read, waiting to be attached to an entry.
 
-    Reading a document and creating an entry are deliberately two steps: the
-    extracted text goes back to the editor first so it can be looked at before
-    anything is saved. That leaves the file itself in limbo for a minute or
-    two, which is what this row is for. Claimed uploads point at their entry;
-    the rest are swept once they're a day old.
+    Extraction hands the text back to the editor before anything is saved, so
+    the file itself sits in limbo meanwhile. Claimed uploads point at their
+    entry; the rest are swept once they're a day old.
     """
 
     __tablename__ = "uploads"
@@ -220,12 +217,9 @@ class Upload(Base):
 def pick_default(renditions: list[Rendition]) -> Rendition | None:
     """The reading an entry leads with.
 
-    A reading of the whole document wins, and the newest of those. Failing that,
-    whichever covers the most: an hour-long recording that was stopped early
-    beats a fifteen-second extract, however recently the extract was made.
-
-    It's what a card plays, and it's the one that can't be thrown away, so an
-    entry that has audio never stops having audio by accident.
+    The newest complete reading wins; failing that, whichever covers the most.
+    It's what a card plays and the one that can't be deleted, so an entry with
+    audio never loses all of it by accident.
     """
     playable = [
         r for r in renditions if r.status in ("ready", "stopped") and r.audio_path

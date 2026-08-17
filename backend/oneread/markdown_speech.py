@@ -69,10 +69,10 @@ _BLANKS = re.compile(r"\n{3,}")
 _TERMINATED = re.compile(r"[.!?…:;,。！？]$")
 
 
-def to_speech(text: str, fmt: str = DEFAULT_FORMAT, *, speak_code: bool = False) -> str:
+def to_speech(text: str, fmt: str = DEFAULT_FORMAT) -> str:
     """Return the words to read out, in order."""
     if fmt == "markdown":
-        text = _flatten_markdown(text, speak_code=speak_code)
+        text = _flatten_markdown(text)
     return _tidy(text)
 
 
@@ -100,10 +100,10 @@ def _sentence(text: str) -> str:
 # --- markdown ---------------------------------------------------------------
 
 
-def _flatten_markdown(text: str, *, speak_code: bool) -> str:
+def _flatten_markdown(text: str) -> str:
     tokens = _md.parse(text)
     blocks: list[str] = []
-    _walk(tokens, 0, len(tokens), blocks, speak_code=speak_code)
+    _walk(tokens, 0, len(tokens), blocks)
     return "\n\n".join(block for block in blocks if block)
 
 
@@ -113,7 +113,6 @@ def _walk(
     end: int,
     blocks: list[str],
     *,
-    speak_code: bool,
     ordinal: int | None = None,
 ) -> None:
     index = start
@@ -140,12 +139,12 @@ def _walk(
         elif kind in ("bullet_list_open", "ordered_list_open"):
             close = _match(tokens, index, kind.replace("_open", "_close"))
             _list(tokens, index + 1, close, blocks, kind == "ordered_list_open",
-                  int(token.attrGet("start") or 1), speak_code=speak_code)
+                  int(token.attrGet("start") or 1))
             index = close + 1
 
         elif kind == "blockquote_open":
             close = _match(tokens, index, "blockquote_close")
-            _walk(tokens, index + 1, close, blocks, speak_code=speak_code)
+            _walk(tokens, index + 1, close, blocks)
             index = close + 1
 
         elif kind == "table_open":
@@ -154,7 +153,7 @@ def _walk(
             index = close + 1
 
         elif kind in ("fence", "code_block"):
-            blocks.append(_code(token, speak_code=speak_code))
+            blocks.append(_code(token))
             index += 1
 
         elif kind == "html_block":
@@ -195,8 +194,6 @@ def _list(
     blocks: list[str],
     numbered: bool,
     first: int,
-    *,
-    speak_code: bool,
 ) -> None:
     counter = first
     index = start
@@ -205,11 +202,7 @@ def _list(
             index += 1
             continue
         close = _match(tokens, index, "list_item_close")
-        _walk(
-            tokens, index + 1, close, blocks,
-            speak_code=speak_code,
-            ordinal=counter if numbered else None,
-        )
+        _walk(tokens, index + 1, close, blocks, ordinal=counter if numbered else None)
         counter += 1
         index = close + 1
 
@@ -222,9 +215,7 @@ def _checkbox(text: str) -> str:
     return f"{'Done' if match.group(1).lower() == 'x' else 'To do'}: {rest}"
 
 
-def _code(token: Token, *, speak_code: bool) -> str:
-    if speak_code:
-        return _sentence(token.content)
+def _code(token: Token) -> str:
     lines = len([line for line in token.content.splitlines() if line.strip()])
     language = (token.info or "").strip().split(" ")[0]
     if language and lines:

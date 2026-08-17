@@ -6,8 +6,7 @@ interface Props {
 
 /**
  * Which slice of the document this recording is. Two readings called "the first
- * minute" look identical in a list; seen as bars, an opening sample and an
- * extract from the middle are obviously different things.
+ * minute" look identical in a list; as bars they don't.
  */
 export function CoverageStrip({ reading }: Props) {
   const total = reading.document_segments;

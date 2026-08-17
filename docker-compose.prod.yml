@@ -82,6 +82,10 @@ services:
       ONEREAD_GENERATE_PER_HOUR: ${ONEREAD_GENERATE_PER_HOUR:-30}
       ONEREAD_LOGIN_PER_MINUTE: ${ONEREAD_LOGIN_PER_MINUTE:-10}
       ONEREAD_PRELOAD_MODEL: ${ONEREAD_PRELOAD_MODEL:-true}
+      # Nothing routine is logged in production: no nginx access log, no
+      # uvicorn access log (below), and the app itself only when something
+      # fails. Set WARNING or INFO for an afternoon when you need to watch it.
+      ONEREAD_LOG_LEVEL: ${ONEREAD_LOG_LEVEL:-ERROR}
 
     # The image defaults to --no-proxy-headers, which is right when the port is
     # exposed but wrong here. Behind nginx every request would otherwise appear
@@ -106,6 +110,13 @@ services:
       - --proxy-headers
       - --forwarded-allow-ips
       - 10.83.7.0/24
+      # A line per request, duplicating one nginx already declined to write —
+      # and the healthcheck alone is 2,880 of them a day. uvicorn's own logger
+      # is separate from the app's and doesn't follow ONEREAD_LOG_LEVEL, hence
+      # the second flag: startup and shutdown lines go quiet, failures don't.
+      - --no-access-log
+      - --log-level
+      - ${ONEREAD_UVICORN_LOG_LEVEL:-error}
 
     # The image's own healthcheck asks for /healthz on 127.0.0.1, which was
     # right when the app answered to any Host. It doesn't here: naming

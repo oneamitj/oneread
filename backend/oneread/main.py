@@ -27,8 +27,10 @@ from .routers import uploads as upload_router
 from .security import BodyLimitMiddleware, SecurityHeadersMiddleware
 from .worker import get_worker
 
+# ONEREAD_LOG_LEVEL, INFO here and ERROR in production, where the request log
+# is off on both nginx and uvicorn and this is the only thing still writing.
 logging.basicConfig(
-    level=logging.INFO,
+    level=get_settings().log_level,
     format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
 )
 log = logging.getLogger("oneread")

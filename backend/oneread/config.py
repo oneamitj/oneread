@@ -33,6 +33,13 @@ class Settings(BaseSettings):
     data_dir: Path = Path("./data")
     database_url: str = ""  # derived from data_dir when empty
 
+    #: Level for the app's own loggers (`oneread.*`). Production runs this at
+    #: ERROR: nginx keeps no access log and uvicorn is started with
+    #: --no-access-log, so what's left in `docker compose logs` is the app
+    #: saying something went wrong and nothing else. WARNING is the setting to
+    #: reach for first when something is off but not yet failing.
+    log_level: str = "INFO"
+
     # --- http ---------------------------------------------------------------
     allowed_hosts: CommaSeparated = ["*"]
     #: Origins allowed to call the API from a browser. Normally empty: the
@@ -106,6 +113,17 @@ class Settings(BaseSettings):
 
     # --- frontend -----------------------------------------------------------
     static_dir: Path = Path("./frontend/dist")
+
+    @field_validator("log_level")
+    @classmethod
+    def _known_level(cls, value: str) -> str:
+        level = value.strip().upper()
+        if level not in {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}:
+            raise ValueError(
+                f"ONEREAD_LOG_LEVEL={value!r} isn't a level. Use one of DEBUG, "
+                "INFO, WARNING, ERROR, CRITICAL."
+            )
+        return level
 
     @field_validator("sample_minute_choices", mode="before")
     @classmethod

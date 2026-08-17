@@ -108,6 +108,11 @@ make prod-cert-renew       # renew now rather than waiting for the timer
 make prod-nginx-check      # parse the nginx config as the container sees it
 ```
 
+`prod-logs` is quiet on purpose: no access log on nginx, none on uvicorn, and
+the app itself only speaks up when something fails. Set `ONEREAD_LOG_LEVEL` to
+`WARNING` or `INFO` in `.env.prod` (and `ONEREAD_UVICORN_LOG_LEVEL=info` for the
+server's own startup lines) when you want to watch it work, then put it back.
+
 `prod-backup` takes the database through SQLite's online backup instead of
 tarring a file that is being written to. To restore:
 

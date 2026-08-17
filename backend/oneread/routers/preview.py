@@ -74,6 +74,20 @@ class PreviewIn(BaseModel):
         return round(value, 2)
 
 
+def check_length(text: str, settings: Settings) -> None:
+    """Refuse an oversized body before flattening and segmenting it.
+
+    Both routes below reduce whatever arrives to a single sentence, but they get
+    there by normalising, parsing and segmenting the whole thing first. Without a
+    ceiling that work is unbounded, which makes a cheap route an expensive one.
+    """
+    if len(text) > settings.max_text_chars:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            f"That's {len(text)} characters. The limit is {settings.max_text_chars}.",
+        )
+
+
 def sample_line(text: str, settings: Settings, fmt: str = DEFAULT_FORMAT) -> str:
     """One sentence of the reader's own text, so the preview is in their language."""
     cleaned = to_speech(text, fmt).strip()
@@ -103,6 +117,7 @@ def preview(
     engine: Annotated[TTSEngine, Depends(get_engine)],
 ) -> FileResponse:
     enforce(limiter, user.id, "That's a lot of previews. Give it a minute.")
+    check_length(payload.text, settings)
 
     line = sample_line(payload.text, settings, payload.format)
     fingerprint = hashlib.sha256(
@@ -157,8 +172,13 @@ class SpeechIn(BaseModel):
 
 
 @router.post("/text", dependencies=[Depends(require_csrf)])
-def spoken_text(payload: SpeechIn, user: CurrentUser) -> SpokenText:
+def spoken_text(
+    payload: SpeechIn,
+    user: CurrentUser,
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> SpokenText:
     """What the reader will actually say. No synthesis, so it's free to call."""
     del user  # the session check is the point; the flattening is stateless
+    check_length(payload.text, settings)
     spoken = to_speech(payload.text, payload.format)
     return SpokenText(text=spoken, characters=len(spoken))

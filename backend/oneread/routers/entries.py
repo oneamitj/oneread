@@ -32,6 +32,7 @@ from ..schemas import (
     SegmentOut,
     SourceFile,
 )
+from ..security import content_disposition
 from ..segmenter import segment_text
 from ..subtitles import slugify
 from ..worker import Worker, calibration_for, get_worker
@@ -533,7 +534,7 @@ def get_source(
         media_type=entry.source_type or "application/octet-stream",
         headers={
             "Cache-Control": "private, max-age=3600",
-            "Content-Disposition": f'attachment; filename="{entry.source_name or path.name}"',
+            "Content-Disposition": content_disposition(entry.source_name or path.name),
         },
     )
 
@@ -549,7 +550,7 @@ def get_spoken_text(
     return PlainTextResponse(
         _spoken_of(entry),
         media_type="text/plain; charset=utf-8",
-        headers={"Content-Disposition": f'attachment; filename="{slugify(entry.title)}.txt"'},
+        headers={"Content-Disposition": content_disposition(f"{slugify(entry.title)}.txt")},
     )
 
 

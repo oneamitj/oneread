@@ -219,9 +219,18 @@ class Worker:
         except SynthesisError as exc:
             self._fail(rendition_id, str(exc))
             return
-        except Exception as exc:
+        except Exception:
+            # An unplanned failure says whatever the library it came from felt
+            # like saying, which tends to be a file path or an internal name.
+            # `rendition.error` is shown in the interface, so the traceback stays
+            # in the log — where it is more use anyway — and the reader gets a
+            # sentence. `SynthesisError` above is the case we do have words for.
             log.exception("synthesis blew up for rendition %s", rendition_id)
-            self._fail(rendition_id, f"Something went wrong while generating audio: {exc}")
+            self._fail(
+                rendition_id,
+                "Something went wrong while generating audio. Try again; if it "
+                "keeps happening, the server log has the details.",
+            )
             return
 
         wall_s = round(time.monotonic() - started, 2)

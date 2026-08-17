@@ -64,6 +64,10 @@ class User(Base):
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
     username: Mapped[str] = mapped_column(String(32), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255))
+    # Stamped into every session cookie. Session tokens are signed rather than
+    # stored, so there is otherwise nothing to delete when one needs to stop
+    # working: raising this number is what makes the old ones stop verifying.
+    token_version: Mapped[int] = mapped_column(Integer, default=1)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow)
 
     entries: Mapped[list[Entry]] = relationship(

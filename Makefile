@@ -9,7 +9,7 @@ install: ## Install backend (editable) and frontend deps
 	cd frontend && npm install
 
 dev-backend: ## Run the API with reload on :8000
-	$(PY) -m uvicorn oneread.main:app --reload --host 127.0.0.1 --port 8000
+	$(PY) -m uvicorn oneread.main:app --reload --host 127.0.0.1 --port 8000 --no-proxy-headers
 
 dev-frontend: ## Run Vite on :5173, proxying /api to :8000
 	cd frontend && npm run dev
@@ -24,8 +24,10 @@ lint: ## Ruff over the backend, tsc over the frontend
 build: ## Build the frontend into frontend/dist
 	cd frontend && npm run build
 
+# --no-proxy-headers: uvicorn's default lets a caller on this machine rewrite the
+# address its requests appear to come from, and rate limits are keyed on that.
 serve: build ## Build, then serve everything from :8000
-	$(PY) -m uvicorn oneread.main:app --host 127.0.0.1 --port 8000
+	$(PY) -m uvicorn oneread.main:app --host 127.0.0.1 --port 8000 --no-proxy-headers
 
 docker-up: ## Build the image and start it
 	docker compose up --build -d

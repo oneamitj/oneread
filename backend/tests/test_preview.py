@@ -96,3 +96,46 @@ def test_spoken_text_endpoint_shows_what_will_be_read(client):
 
 def test_spoken_text_needs_a_session(client):
     assert client.post("/api/preview/text", json={"text": "hi"}).status_code == 401
+
+
+def test_a_preview_of_more_text_than_an_entry_holds_is_refused(client, settings, engine):
+    """Both routes keep one sentence, but reach it by parsing everything first."""
+    sign_in(client)
+    over = "word " * ((settings.max_text_chars // 5) + 1)
+
+    response = client.post("/api/preview", json={**SAMPLE, "text": over})
+    assert response.status_code == 422
+    assert "limit" in response.json()["message"]
+    assert engine.calls == []  # nothing was synthesized, nothing was segmented
+
+    assert client.post("/api/preview/text", json={"text": over}).status_code == 422
+
+
+def test_a_body_over_the_request_limit_is_refused_before_it_is_parsed(client, settings):
+    sign_in(client)
+    response = client.post(
+        "/api/preview/text",
+        content=b'{"text": "' + b"a" * (settings.max_request_bytes + 1024) + b'"}',
+        headers={"Content-Type": "application/json"},
+    )
+    assert response.status_code == 413
+    assert "limit" in response.json()["message"]
+
+
+def test_an_over_cap_body_without_a_length_is_refused_as_it_arrives(client, settings):
+    """Leaving `Content-Length` off counts the bytes instead of trusting the header."""
+
+    def streamed():
+        yield b'{"text": "'
+        for _ in range(settings.max_request_bytes // 4096 + 8):
+            yield b"a" * 4096
+        yield b'"}'
+
+    sign_in(client)
+    response = client.post(
+        "/api/preview/text", content=streamed(), headers={"Content-Type": "application/json"}
+    )
+    # 413 in this app's own error shape, not whatever the cut-short body made
+    # the route below think had happened.
+    assert response.status_code == 413
+    assert "limit" in response.json()["message"]

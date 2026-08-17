@@ -56,6 +56,15 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
 
 # One worker on purpose: the model is held in memory once, and synthesis runs
 # on a single background thread behind it.
+#
+# --no-proxy-headers is deliberate, and it has to be said out loud: uvicorn
+# enables proxy headers by default and trusts loopback, which means it replaces
+# the connecting address with whatever X-Forwarded-For claims. Rate limits keyed
+# on that address then reset on every request. Nothing here needs the forwarded
+# scheme (cookie_secure is set explicitly), so the whole mechanism comes off.
+# Behind a reverse proxy, turn it back on naming the proxy's own address:
+#   --proxy-headers --forwarded-allow-ips 172.18.0.2
+# Never "*", and never the default, unless nothing but the proxy can reach the
+# port.
 CMD ["uvicorn", "oneread.main:app", \
-     "--host", "0.0.0.0", "--port", "8000", \
-     "--workers", "1", "--proxy-headers", "--forwarded-allow-ips", "*"]
+     "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--no-proxy-headers"]

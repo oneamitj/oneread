@@ -81,6 +81,9 @@ export const api = {
 
   signOut: () => request<void>("/api/auth/logout", { method: "POST" }),
 
+  /** Drop every other session for this account. This browser stays signed in. */
+  revokeSessions: () => request<void>("/api/auth/revoke-sessions", { method: "POST" }),
+
   list: (query: string, tags: string[]) => {
     const params = new URLSearchParams();
     if (query.trim()) params.set("q", query.trim());

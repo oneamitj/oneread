@@ -24,7 +24,7 @@ from .routers import meta as meta_router
 from .routers import preview as preview_router
 from .routers import renditions as rendition_router
 from .routers import uploads as upload_router
-from .security import SecurityHeadersMiddleware
+from .security import BodyLimitMiddleware, SecurityHeadersMiddleware
 from .worker import get_worker
 
 logging.basicConfig(
@@ -82,6 +82,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     # The segment list for a long document is a few hundred kilobytes of text.
     app.add_middleware(GZipMiddleware, minimum_size=1024)
+    # Added last, so it runs first and a body over the limit is turned away
+    # before anything downstream has read it.
+    app.add_middleware(
+        BodyLimitMiddleware,
+        limit=settings.max_request_bytes,
+        # Uploads have their own, larger ceiling; the slack is for the multipart
+        # wrapper around the file rather than the file itself.
+        upload_limit=settings.max_upload_bytes + 1024 * 1024,
+    )
     app.add_middleware(SecurityHeadersMiddleware, hsts=settings.cookie_secure)
     app.add_middleware(SessionRefreshMiddleware, settings=settings)
     if settings.allowed_hosts and settings.allowed_hosts != ["*"]:

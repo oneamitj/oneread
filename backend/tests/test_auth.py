@@ -66,6 +66,167 @@ def test_login_is_rate_limited(client, settings):
     auth_routes._login_limiter = None
 
 
+def test_a_rotating_forwarded_header_does_not_shake_off_the_limit(client, settings):
+    """`X-Forwarded-For` is written by the caller, so it can't be the only key."""
+    from oneread.routers import auth as auth_routes
+
+    auth_routes._login_limiter = None
+    auth_routes._login_peer_limiter = None
+    settings.login_per_minute = 3
+    settings.login_peer_factor = 2  # so the peer bucket holds 6
+
+    seen = [
+        client.post(
+            "/api/auth/login",
+            json={"username": f"user{i:02d}", "password": "hunter2hunter"},
+            headers={"X-Forwarded-For": f"10.0.0.{i}"},  # a fresh identity each time
+        ).status_code
+        for i in range(12)
+    ]
+    assert 429 in seen
+    auth_routes._login_limiter = None
+    auth_routes._login_peer_limiter = None
+
+
+def test_guessing_at_one_account_is_capped_however_the_address_moves(client, settings):
+    """The limit that holds when both address keys have been shaken off.
+
+    uvicorn rewrites the connecting address from `X-Forwarded-For` by default, so
+    a caller on the same host can reset an address-keyed bucket at will. The user
+    id under attack is the one key that can't move.
+    """
+    from oneread.routers import auth as auth_routes
+
+    for name in ("_login_limiter", "_login_peer_limiter", "_login_failure_limiter"):
+        setattr(auth_routes, name, None)
+    settings.login_per_minute = 1_000  # the address limits are not what's on trial
+    settings.login_failures_per_minute = 4
+
+    sign_in(client, username="victim.here", password="the-real-password")
+
+    seen = [
+        client.post(
+            "/api/auth/login",
+            json={"username": "victim.here", "password": f"wrong-guess-{i:03d}"},
+            headers={"X-Forwarded-For": f"203.0.113.{i}"},  # a new address each time
+        ).status_code
+        for i in range(10)
+    ]
+    # Four wrong answers allowed, then the account stops answering guesses at all.
+    assert seen == [401] * 4 + [429] * 6
+
+    for name in ("_login_limiter", "_login_peer_limiter", "_login_failure_limiter"):
+        setattr(auth_routes, name, None)
+
+
+def test_the_limit_on_guesses_cannot_lock_someone_out_of_their_own_account(client, settings):
+    """The limit is only consulted when an answer is wrong, so a right one sails past.
+
+    Otherwise this becomes a way to keep the owner out: guess at their user id
+    until the bucket empties and their own password stops working too.
+    """
+    from oneread.routers import auth as auth_routes
+
+    for name in ("_login_limiter", "_login_peer_limiter", "_login_failure_limiter"):
+        setattr(auth_routes, name, None)
+    settings.login_per_minute = 1_000
+    settings.login_failures_per_minute = 3
+
+    sign_in(client, username="target.user", password="correct-horse-battery")
+    spent = [
+        client.post(
+            "/api/auth/login",
+            # Long enough to be a real attempt: a short one is refused as
+            # malformed and never reaches the limit at all.
+            json={"username": "target.user", "password": f"wrong-answer-{i:03d}"},
+        ).status_code
+        for i in range(5)
+    ]
+    assert spent[:3] == [401, 401, 401]  # three wrong answers, three tokens
+    assert spent[3:] == [429, 429]  # then the guessing stops
+
+    # And the owner walks straight in regardless.
+    assert sign_in(client, username="target.user", password="correct-horse-battery")[
+        "created"
+    ] is False
+
+    for name in ("_login_limiter", "_login_peer_limiter", "_login_failure_limiter"):
+        setattr(auth_routes, name, None)
+
+
+def test_one_visitors_attempts_do_not_lock_out_another(settings, engine):
+    """The peer bucket is per-connection, so a busy neighbour isn't your problem."""
+    from fastapi.testclient import TestClient
+    from sqlalchemy.orm import sessionmaker
+
+    from oneread import db as db_module
+    from oneread.config import get_settings
+    from oneread.main import create_app
+    from oneread.routers import auth as auth_routes
+
+    sql_engine = db_module.create_engine_for(settings.sqlalchemy_url)
+    db_module.init_db(sql_engine)
+    db_module.set_session_factory(sessionmaker(bind=sql_engine, expire_on_commit=False))
+
+    auth_routes._login_limiter = None
+    auth_routes._login_peer_limiter = None
+    settings.login_per_minute = 2
+    settings.login_peer_factor = 1
+
+    app = create_app(settings)
+    app.dependency_overrides[get_settings] = lambda: settings
+
+    def attempt(client: TestClient, who: str) -> int:
+        return client.post(
+            "/api/auth/login",
+            json={"username": who, "password": "hunter2hunter"},
+            headers={"X-Requested-With": "oneread"},
+        ).status_code
+
+    with TestClient(app, client=("10.1.1.1", 40000)) as noisy:
+        assert 429 in [attempt(noisy, f"noisy{i:02d}") for i in range(6)]
+
+    with TestClient(app, client=("10.2.2.2", 40000)) as quiet:
+        assert attempt(quiet, "quiet.one") == 200
+
+    auth_routes._login_limiter = None
+    auth_routes._login_peer_limiter = None
+    sql_engine.dispose()
+
+
+def test_revoking_sessions_keeps_this_device_and_drops_the_others(client, settings):
+    from oneread.main import create_app
+
+    signed_in = sign_in(client)
+    stolen = client.cookies.get(settings.cookie_name)
+    assert stolen
+
+    assert client.post("/api/auth/revoke-sessions").status_code == 204
+    # The device that asked carries on with the cookie it was just handed.
+    assert client.get("/api/auth/me").json()["username"] == signed_in["user"]["username"]
+
+    # Another browser holding the cookie from before is turned away.
+    from fastapi.testclient import TestClient
+
+    with TestClient(create_app(settings)) as elsewhere:
+        elsewhere.cookies.set(settings.cookie_name, stolen)
+        response = elsewhere.get("/api/auth/me")
+        assert response.status_code == 401
+        assert "signed out" in response.json()["message"]
+
+
+def test_a_cookie_from_before_versions_existed_still_works(client, settings):
+    """The column arrives with existing databases already full of live sessions."""
+    from itsdangerous import URLSafeTimedSerializer
+
+    signed_in = sign_in(client)
+    old_shape = URLSafeTimedSerializer(settings.secret_key, salt="oneread.session").dumps(
+        {"uid": signed_in["user"]["id"]}  # no "v" at all
+    )
+    client.cookies.set(settings.cookie_name, old_shape)
+    assert client.get("/api/auth/me").status_code == 200
+
+
 def test_a_restart_does_not_sign_everyone_out(tmp_path):
     """The signing key has to outlive the process, or every cookie dies with it."""
     from oneread.config import Settings, prepare

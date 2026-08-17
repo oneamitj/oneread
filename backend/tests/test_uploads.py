@@ -155,9 +155,36 @@ def test_a_zip_bomb_is_refused_before_anything_parses_it():
         extract(documents.zip_bomb(), "bomb.docx")
 
 
+def test_a_bomb_that_lies_about_its_size_is_refused_too(monkeypatch):
+    """The sizes in a zip's headers are a claim, so they can't be the whole check.
+
+    A 40 MB member declaring 512 bytes passes any guard that adds the declared
+    numbers up. Nothing may read it, so this also watches for the parsers being
+    reached at all.
+    """
+    import docx
+
+    def refuse(*args, **kwargs):
+        raise AssertionError("the document parser was handed a file the guard should have stopped")
+
+    monkeypatch.setattr(docx, "Document", refuse)
+
+    bomb = documents.lying_zip_bomb()
+    assert len(bomb) < 1024 * 1024  # small going in, enormous coming out
+    with pytest.raises(UnreadableFile) as problem:
+        extract(bomb, "bomb.docx")
+    assert "unpacks to far more" in str(problem.value) or "damaged" in str(problem.value)
+
+
 def test_declared_xml_entities_are_refused():
     with pytest.raises(UnreadableFile, match="won't run"):
         extract(documents.entity_bomb(), "evil.docx")
+
+
+def test_an_entity_declared_past_the_first_few_kilobytes_is_still_refused():
+    """Peeking at the head of each part misses a declaration behind a long comment."""
+    with pytest.raises(UnreadableFile, match="won't run"):
+        extract(documents.late_entity_bomb(), "evil.docx")
 
 
 def test_legacy_formats_explain_themselves_when_libreoffice_is_absent():
@@ -218,6 +245,36 @@ def test_the_file_is_kept_and_can_be_downloaded_again(client, settings):
     kept = next(settings.upload_dir.rglob("*.docx"))
     assert kept.is_file()
     assert kept.parent.name == entry["id"]
+
+
+def test_a_filename_with_a_quote_in_it_cannot_break_the_header(client):
+    """A quote would otherwise end the header's quoted string and truncate the name."""
+    boundary = "----test"
+    body = (
+        f'--{boundary}\r\n'
+        'Content-Disposition: form-data; name="file"; filename="a\\"b.txt"\r\n'
+        "Content-Type: text/plain\r\n\r\n"
+        "Some words to read aloud.\r\n"
+        f"--{boundary}--\r\n"
+    ).encode()
+
+    sign_in(client)
+    staged = client.post(
+        "/api/uploads",
+        content=body,
+        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"},
+    ).json()
+    assert staged["filename"] == 'a"b.txt'  # kept as uploaded, quote and all
+
+    entry_id = client.post(
+        "/api/entries",
+        json={"title": "Quoted", "body": staged["text"], "upload_id": staged["id"]},
+    ).json()["id"]
+
+    header = client.get(f"/api/entries/{entry_id}/source").headers["content-disposition"]
+    # The quoted half is safe to parse, and the real name rides along beside it.
+    assert header.startswith('attachment; filename="a_b.txt"')
+    assert "filename*=UTF-8''a%22b.txt" in header
 
 
 def test_the_spoken_text_downloads_as_a_plain_file(client):

@@ -48,6 +48,9 @@ MAX_COLUMNS = 200
 MAX_ZIP_MEMBERS = 2_000
 MAX_ZIP_RATIO = 200  # a real docx manages five- to ten-fold
 ZIP_RATIO_FLOOR = 8 * 1024 * 1024  # below this, a high ratio is just a tidy file
+ZIP_CHUNK = 256 * 1024
+#: Carried between chunks so a marker straddling the boundary is still seen.
+ENTITY_OVERLAP = 16
 
 # A PDF with less text than this per page is pictures of pages, not a document.
 MIN_PDF_CHARS_PER_PAGE = 20
@@ -277,15 +280,36 @@ def _decode(data: bytes) -> str:
 # --- zip safety --------------------------------------------------------------
 
 
+TOO_BIG = "That file unpacks to far more than it looks like. Skipped."
+
+
+def _oversized(unpacked: int, packed: int, max_unzipped: int) -> bool:
+    if unpacked > max_unzipped:
+        return True
+    # Below the floor a high ratio is just a tidy file, not an attack.
+    return unpacked > ZIP_RATIO_FLOOR and unpacked > packed * MAX_ZIP_RATIO
+
+
 def _guard_zip(data: bytes, job: _Job) -> None:
     """Look over a zip container before any parser opens it.
 
     docx, pptx, xlsx and the OpenDocument formats are all zips of XML. Two
     cheap attacks live there: a small archive that expands to fill the disk,
     and an XML entity declaration that expands inside the parser instead.
-    python-docx and python-pptx hand their XML to lxml with entity resolution
-    on, so refusing the declaration outright is both cheaper and more certain
-    than hoping a parser setting holds.
+
+    The sizes in a zip's own headers are written by whoever built it, so they
+    are a claim rather than a measurement: an archive can declare a hundred
+    bytes and hold four hundred megabytes. So the declared numbers are only a
+    fast reject, and every member is then read through in chunks and counted
+    for real. That costs one bounded pass — `read` hands back at most a chunk
+    at a time, and a member that outruns its own declared size is refused on
+    the first one, long before a parser sees it.
+
+    The entity check is defence in depth rather than the only line: python-docx
+    and python-pptx both build their parser with `resolve_entities=False`, and
+    odfpy parses through `defusedxml.sax`. It stays because it is nearly free
+    once the bytes are already going past, and because a declaration is a
+    reasonable thing to refuse outright.
     """
     try:
         with zipfile.ZipFile(io.BytesIO(data)) as bundle:
@@ -293,22 +317,41 @@ def _guard_zip(data: bytes, job: _Job) -> None:
             if len(members) > MAX_ZIP_MEMBERS:
                 raise UnreadableFile("There are too many parts inside that file to read it.")
 
-            unpacked = sum(member.file_size for member in members)
-            if unpacked > job.max_unzipped:
-                raise UnreadableFile("That file unpacks to far more than it looks like. Skipped.")
-            if unpacked > ZIP_RATIO_FLOOR and unpacked > len(data) * MAX_ZIP_RATIO:
-                raise UnreadableFile("That file unpacks to far more than it looks like. Skipped.")
+            if _oversized(
+                sum(member.file_size for member in members), len(data), job.max_unzipped
+            ):
+                raise UnreadableFile(TOO_BIG)
 
+            total = 0
             for member in members:
-                if not member.filename.lower().endswith((".xml", ".rels")):
+                if member.is_dir():
                     continue
+                scan = member.filename.lower().endswith((".xml", ".rels"))
+                seen = 0
+                tail = b""
                 with bundle.open(member) as stream:
-                    head = stream.read(4096)
-                if b"<!DOCTYPE" in head or b"<!ENTITY" in head:
-                    raise UnreadableFile(
-                        "That file has instructions inside it that oneread won't run."
-                    )
+                    while True:
+                        chunk = stream.read(ZIP_CHUNK)
+                        if not chunk:
+                            break
+                        seen += len(chunk)
+                        total += len(chunk)
+                        if seen > member.file_size or _oversized(
+                            total, len(data), job.max_unzipped
+                        ):
+                            raise UnreadableFile(TOO_BIG)
+                        if scan:
+                            window = tail + chunk
+                            if b"<!DOCTYPE" in window or b"<!ENTITY" in window:
+                                raise UnreadableFile(
+                                    "That file has instructions inside it that "
+                                    "oneread won't run."
+                                )
+                            tail = window[-ENTITY_OVERLAP:]
     except zipfile.BadZipFile:
+        # A member whose real contents don't match its declared size fails its
+        # checksum here, which is the same answer as a truncated file: we can't
+        # read it, and we haven't spent anything finding that out.
         raise UnreadableFile(
             "That file is damaged, or it isn't the kind of file its name says it is."
         ) from None

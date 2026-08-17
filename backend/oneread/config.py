@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     # --- http ---------------------------------------------------------------
     allowed_hosts: list[str] = ["*"]
     cors_origins: list[str] = []
+    #: Ceiling on a request body, for everything except uploads (which carry
+    #: their own, larger limit). A 100k-character entry is comfortably inside
+    #: this even once JSON escaping has had its way with it.
+    max_request_bytes: int = 2 * 1024 * 1024
     cookie_secure: bool = False
     cookie_name: str = "oneread_session"
     session_max_age_s: int = 60 * 60 * 24 * 30
@@ -66,6 +70,17 @@ class Settings(BaseSettings):
 
     # --- rate limits --------------------------------------------------------
     login_per_minute: int = 10
+    #: Sign-in attempts are also counted against the address that opened the
+    #: connection, so rotating `X-Forwarded-For` can't shake the limit off. That
+    #: bucket is this many times the per-client one, because behind a proxy
+    #: every visitor shares it. Raise it if a busy shared proxy hits the ceiling.
+    login_peer_factor: int = 5
+    #: Wrong passwords for one user id per minute, whatever address they appear
+    #: to come from. Addresses can be rewritten and connections can be reopened;
+    #: the account being guessed at is the one thing an attacker after it can't
+    #: vary. Only failures count, so this never stands between someone and their
+    #: own account.
+    login_failures_per_minute: int = 10
     generate_per_hour: int = 30
     preview_per_hour: int = 120
     upload_per_hour: int = 60

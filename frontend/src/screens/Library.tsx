@@ -43,6 +43,16 @@ export function Library({ user, meta, onSignOut, onOpen, revision }: Props) {
     [query, activeTags, onSignOut],
   );
 
+  const revokeSessions = useCallback(async () => {
+    try {
+      await api.revokeSessions();
+      setNotice("Signed out everywhere else. This browser is still signed in.");
+    } catch (problem) {
+      if (problem instanceof ApiError && problem.status === 401) onSignOut();
+      else setNotice(problem instanceof ApiError ? problem.message : "Couldn't do that.");
+    }
+  }, [onSignOut]);
+
   // Debounced so typing in the search box doesn't hammer the server.
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), query ? 180 : 0);
@@ -145,6 +155,9 @@ export function Library({ user, meta, onSignOut, onOpen, revision }: Props) {
             <summary className="btn btn--quiet">{user.username}</summary>
             <div className="menu__pop glass glass--thin">
               <button type="button" onClick={onSignOut}>Sign out</button>
+              <button type="button" onClick={() => void revokeSessions()}>
+                Sign out everywhere else
+              </button>
             </div>
           </details>
         </div>

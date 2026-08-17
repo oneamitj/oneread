@@ -25,6 +25,9 @@ class FakeEngine(TTSEngine):
         self.settings = settings
         self.calls: list[dict] = []
         self.fail_with: str | None = None
+        #: An unplanned break, the kind a library throws. Unlike `fail_with`,
+        #: nothing about this is meant for a reader to see.
+        self.crash_with: BaseException | None = None
         # Tests that need to interfere with a job in flight hold it here.
         # `hold_at` is the segment index to block on, so a test can let a couple
         # of sentences land before it interferes.
@@ -76,6 +79,8 @@ class FakeEngine(TTSEngine):
             self.started.set()
         if self.fail_with:
             raise SynthesisError(self.fail_with)
+        if self.crash_with is not None:
+            raise self.crash_with
 
         every = segment_text(text, lang=lang)
         segments = every[start_segment:end_segment]

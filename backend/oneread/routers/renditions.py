@@ -14,6 +14,7 @@ from ..auth import CurrentUser, require_csrf
 from ..db import get_session
 from ..models import LIVE_STATUSES, Entry, Rendition, pick_default, utcnow
 from ..schemas import RenditionDetail
+from ..security import content_disposition
 from ..subtitles import slugify, to_srt, to_vtt
 
 router = APIRouter(prefix="/api/renditions", tags=["renditions"])
@@ -138,8 +139,8 @@ def get_audio(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "The audio file is missing.")
     headers = {"Cache-Control": "private, max-age=3600"}
     if download:
-        headers["Content-Disposition"] = (
-            f'attachment; filename="{_filename(session, rendition)}.wav"'
+        headers["Content-Disposition"] = content_disposition(
+            f"{_filename(session, rendition)}.wav"
         )
     return FileResponse(path, media_type="audio/wav", headers=headers)
 
@@ -165,9 +166,7 @@ def get_srt(
         to_srt(rendition.cues or []),
         media_type="application/x-subrip; charset=utf-8",
         headers={
-            "Content-Disposition": (
-                f'attachment; filename="{_filename(session, rendition)}.srt"'
-            )
+            "Content-Disposition": content_disposition(f"{_filename(session, rendition)}.srt")
         },
     )
 
@@ -182,8 +181,8 @@ def get_vtt(
     rendition = _with_cues(session, rendition_id, user.id)
     headers = {}
     if download:
-        headers["Content-Disposition"] = (
-            f'attachment; filename="{_filename(session, rendition)}.vtt"'
+        headers["Content-Disposition"] = content_disposition(
+            f"{_filename(session, rendition)}.vtt"
         )
     return PlainTextResponse(
         to_vtt(rendition.cues or []),

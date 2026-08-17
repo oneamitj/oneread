@@ -28,6 +28,15 @@ services:
   # Uncomment for automatic TLS on a real domain, then point DNS at this host
   # and set ONEREAD_COOKIE_SECURE=true and ONEREAD_ALLOWED_HOSTS=your.domain.
   #
+  # The app deliberately runs without --proxy-headers (see the Dockerfile), so
+  # behind a proxy every request arrives from the proxy's address: rate limits
+  # then share one bucket, which ONEREAD_LOGIN_PEER_FACTOR is there to widen.
+  # To get real client addresses back, override the command naming the proxy:
+  #   command: ["uvicorn", "oneread.main:app", "--host", "0.0.0.0", "--port", "8000",
+  #             "--workers", "1", "--proxy-headers", "--forwarded-allow-ips", "<caddy ip>"]
+  # Never "*" there — that lets any caller pick its own address, and with it a
+  # fresh rate-limit bucket on every request.
+  #
   # caddy:
   #   image: caddy:2-alpine
   #   restart: unless-stopped

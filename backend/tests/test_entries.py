@@ -70,6 +70,28 @@ def test_a_failed_reading_says_why(client, engine):
     assert client.get(f"/api/renditions/{failed['id']}/audio").status_code == 409
 
 
+def test_an_unplanned_failure_does_not_repeat_the_libraries_own_words(client, engine, caplog):
+    """A break we have no sentence for gets a plain one, not the internals.
+
+    Whatever a library says on the way down names paths and objects inside the
+    server. That belongs in the log, which is what the reader is pointed at.
+    """
+    inner = "onnxruntime: failed to load /opt/supertonic/models/decoder.onnx (errno 13)"
+    engine.crash_with = RuntimeError(inner)
+    sign_in(client)
+
+    with caplog.at_level("ERROR", logger="oneread.worker"):
+        entry = create(client)
+        failed = wait_for(client, entry["id"], status="failed")
+
+    assert "Something went wrong while generating audio." in failed["error"]
+    for leaked in ("onnxruntime", "/opt/supertonic", "errno", "RuntimeError"):
+        assert leaked not in failed["error"]
+    # And the promise the message makes is kept: the detail is in the log.
+    assert inner in caplog.text
+    assert "Traceback" in caplog.text
+
+
 def test_search_covers_title_body_and_tags(client):
     sign_in(client)
     create(client, title="Kitchen notes", body="Warm the pan first.", tags=["cooking"])

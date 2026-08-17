@@ -9,6 +9,7 @@ that one is assembled by hand, xref table and all.
 from __future__ import annotations
 
 import io
+import struct
 import zipfile
 
 
@@ -156,6 +157,37 @@ def zip_bomb(size: int = 60 * 1024 * 1024) -> bytes:
     return buffer.getvalue()
 
 
+def lying_zip_bomb(size: int = 40 * 1024 * 1024, claim: int = 512) -> bytes:
+    """A bomb that *declares* itself small.
+
+    The sizes in a zip's headers are written by whoever built the file, so a
+    guard that adds them up is reading a claim. This patches both copies of the
+    uncompressed size — local header and central directory — down to `claim`
+    bytes for a member that isn't XML, since a guard peering into the XML parts
+    would trip over the checksum there and never reach the rest.
+    """
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as bundle:
+        bundle.writestr("[Content_Types].xml", b"<Types/>")
+        bundle.writestr("word/media/image1.png", b"\0" * size)
+    raw = bytearray(buffer.getvalue())
+
+    bomb = "word/media/image1.png"
+    local = zipfile.ZipFile(io.BytesIO(bytes(raw))).getinfo(bomb).header_offset
+    struct.pack_into("<I", raw, local + 22, claim)
+
+    # Walk the central directory from the end record rather than searching for
+    # the signature, which also occurs inside compressed data.
+    end = raw.rfind(b"PK\x05\x06")
+    at = struct.unpack_from("<I", raw, end + 16)[0]
+    while raw[at : at + 4] == b"PK\x01\x02":
+        name_len, extra_len, comment_len = struct.unpack_from("<HHH", raw, at + 28)
+        if bytes(raw[at + 46 : at + 46 + name_len]).decode() == bomb:
+            struct.pack_into("<I", raw, at + 24, claim)
+        at += 46 + name_len + extra_len + comment_len
+    return bytes(raw)
+
+
 def entity_bomb() -> bytes:
     """An office file whose XML declares entities, the billion-laughs shape."""
     buffer = io.BytesIO()
@@ -163,6 +195,19 @@ def entity_bomb() -> bytes:
         bundle.writestr(
             "word/document.xml",
             b'<?xml version="1.0"?><!DOCTYPE lol [<!ENTITY a "ha ha ha">]>'
+            b"<w:document>&a;</w:document>",
+        )
+    return buffer.getvalue()
+
+
+def late_entity_bomb(padding: int = 8 * 1024) -> bytes:
+    """The same declaration, hidden behind enough comment to outrun a peek."""
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as bundle:
+        bundle.writestr(
+            "word/document.xml",
+            b'<?xml version="1.0"?><!-- ' + b"x" * padding + b" -->"
+            b'<!DOCTYPE lol [<!ENTITY a SYSTEM "file:///etc/passwd">]>'
             b"<w:document>&a;</w:document>",
         )
     return buffer.getvalue()

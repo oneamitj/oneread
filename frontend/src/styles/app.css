@@ -1539,3 +1539,54 @@
   .switchrow__left,
   .switchrow__right { width: 100%; justify-content: space-between; }
 }
+
+/* --- the analytics question --------------------------------------------- */
+
+/* A bar on the bottom edge rather than a card floating above it: one row of
+   furniture, so it costs the library one row of height and reads as part of
+   the window chrome. Under the editor's layer (50), not over it — a sheet is
+   work in progress and this can wait until it closes. */
+.consent {
+  position: fixed;
+  z-index: 40;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-4);
+  padding: var(--s-2) var(--s-4);
+  padding-bottom: max(var(--s-2), env(safe-area-inset-bottom));
+  border-radius: 0;
+  border-inline: 0;
+  border-bottom: 0;
+  animation: consent-up var(--t-slow) var(--ease-out) both;
+  animation-delay: 600ms;
+}
+
+/* Late enough that the library has drawn and been looked at first. */
+@keyframes consent-up {
+  from { opacity: 0; transform: translateY(100%); }
+  to   { opacity: 1; transform: none; }
+}
+
+.consent__copy {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--ink-2);
+  text-wrap: pretty;
+}
+
+/* Both answers the same size. A greyed-out "no" next to a bright "allow" is a
+   nudge, and a nudged consent isn't one. */
+.consent__acts { display: flex; gap: var(--s-2); flex: none; }
+.consent__acts .btn { padding: 0.35rem 0.75rem; font-size: 0.875rem; }
+
+/* Where one row genuinely can't hold it, the text wraps above the buttons —
+   still the shortest thing that fits, not a card. */
+@media (max-width: 44rem) {
+  .consent { flex-wrap: wrap; justify-content: flex-end; gap: var(--s-2) var(--s-3); }
+  .consent__copy { flex: 1 1 100%; }
+}

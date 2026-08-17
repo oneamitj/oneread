@@ -12,15 +12,19 @@ from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 # The frontend is a plain Vite bundle with inline styles from the design tokens,
-# so 'unsafe-inline' stays on styles only. No inline scripts, no remote origins.
+# so 'unsafe-inline' stays on styles only. Still no inline scripts: Microsoft
+# Clarity is loaded from a module rather than the vendor's inline snippet, so
+# only its origins are named here — the tag itself, the beacons it sends back,
+# and the blob worker it does the uploading from.
 CSP = (
     "default-src 'self'; "
-    "script-src 'self'; "
+    "script-src 'self' https://www.clarity.ms https://*.clarity.ms; "
+    "worker-src 'self' blob:; "
     "style-src 'self' 'unsafe-inline'; "
-    "img-src 'self' data: blob:; "
+    "img-src 'self' data: blob: https://*.clarity.ms https://c.bing.com; "
     "media-src 'self' blob:; "
     "font-src 'self' data:; "
-    "connect-src 'self'; "
+    "connect-src 'self' https://*.clarity.ms https://c.bing.com; "
     "object-src 'none'; "
     "base-uri 'self'; "
     "form-action 'self'; "

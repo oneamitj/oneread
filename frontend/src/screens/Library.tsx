@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { setConsent, useConsent } from "../analytics/consent";
 import { api, ApiError } from "../api";
 import { EntryCard } from "../components/EntryCard";
 import { EntryEditor } from "../components/EntryEditor";
@@ -25,6 +26,7 @@ export function Library({ user, meta, onSignOut, onOpen, revision }: Props) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const analytics = useConsent();
 
   const load = useCallback(
     async (options: { quiet?: boolean } = {}) => {
@@ -157,6 +159,20 @@ export function Library({ user, meta, onSignOut, onOpen, revision }: Props) {
               <button type="button" onClick={onSignOut}>Sign out</button>
               <button type="button" onClick={() => void revokeSessions()}>
                 Sign out all sessions
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const next = analytics === "granted" ? "denied" : "granted";
+                  setConsent(next);
+                  setNotice(
+                    next === "granted"
+                      ? "Usage analytics on. Recording starts from here."
+                      : "Usage analytics off. Recording stopped and the cookies are gone.",
+                  );
+                }}
+              >
+                {analytics === "granted" ? "Turn off usage analytics" : "Turn on usage analytics"}
               </button>
             </div>
           </details>

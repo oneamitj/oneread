@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
+import { clarityPage } from "./analytics/clarity";
 import { api, ApiError } from "./api";
+import { ConsentBar } from "./components/ConsentBar";
 import { AuthGate } from "./screens/AuthGate";
 import { EntryPage } from "./screens/EntryPage";
 import { Library } from "./screens/Library";
@@ -68,6 +70,14 @@ export default function App() {
 
   const entryId = entryFromPath(path);
 
+  // One Clarity session covers the whole app, so the screen is a tag rather
+  // than a page load. Waits for the session check: before it lands, nobody is
+  // on the sign-in screen yet, they're on the boot state.
+  useEffect(() => {
+    if (!checked) return;
+    clarityPage(!user || !meta ? "sign-in" : entryId ? "entry" : "library");
+  }, [checked, user, meta, entryId]);
+
   return (
     <>
       <div className="backdrop" aria-hidden="true" />
@@ -98,6 +108,7 @@ export default function App() {
           onSignOut={() => void signOut()}
         />
       )}
+      {checked ? <ConsentBar /> : null}
     </>
   );
 }

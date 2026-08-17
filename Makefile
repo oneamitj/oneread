@@ -47,7 +47,7 @@ prod-init: ## First run: data dir, first certificate, then bring it all up
 
 prod-update: ## Rebuild and roll forward (this is the deploy)
 	$(PROD) up -d --build --remove-orphans
-	$(PROD) image prune -f
+	docker image prune -f
 
 prod-logs: ## Follow the logs
 	$(PROD) logs -f --tail=100

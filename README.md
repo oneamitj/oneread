@@ -183,17 +183,88 @@ cd backend && uv pip compile pyproject.toml --generate-hashes --universal \
 
 ## Putting it on the internet
 
-Terminate TLS in front of the app and set two things:
+`docker-compose.prod.yml` is the whole deployment: the app, an nginx that
+terminates TLS in front of it, and a certbot that keeps the certificate current.
+Point the domain's A record at the host first — the certificate is issued by
+Let's Encrypt fetching a file over http, so the name has to resolve here before
+any of this works.
 
 ```sh
-ONEREAD_COOKIE_SECURE=true
-ONEREAD_ALLOWED_HOSTS=oneread.example.com
+cp .env.prod.example .env.prod
+$EDITOR .env.prod          # the domain and an email address, at least
+make prod-init
 ```
 
-Without the first, session cookies travel in the clear. Without the second, the
-app answers to any Host header. There's a commented Caddy service in
-`docker-compose.yml` that handles certificates if you don't already have a
-reverse proxy.
+That makes `./data` writable by the app's user, puts a throwaway self-signed
+certificate in place so nginx can start at all, gets the real one, and brings
+everything up. The first build downloads the 385 MB model, so give it a few
+minutes. Set `CERTBOT_STAGING=1` for a dry run against Let's Encrypt's staging
+endpoint: a typo in the domain costs an hour of lockout on the real one and
+nothing at all there.
+
+Deploying a change after that is one command:
+
+```sh
+make prod-update           # rebuild, roll forward, drop the old image
+```
+
+The rest:
+
+```sh
+make prod-logs             # follow everything
+make prod-ps               # what's running, and is it healthy
+make prod-backup           # snapshot ./data into backups/
+make prod-cert-renew       # renew now rather than waiting for the timer
+make prod-nginx-check      # parse the nginx config as the container sees it
+```
+
+`prod-backup` doesn't simply tar `./data`, because a plain copy of a SQLite file
+that's being written to restores as a corrupt database. It takes the database
+through SQLite's own online backup into `data/backup/oneread.db` and leaves the
+live files out of the archive. To restore, unpack it and move that file up one
+level:
+
+```sh
+tar -xzf backups/oneread-20260101-120000.tar.gz
+mv data/backup/oneread.db data/oneread.db && rmdir data/backup
+```
+
+The archive holds `secret.key` as well as the audio, so it signs every session
+cookie the app has ever issued. Keep it somewhere you'd keep a password.
+
+Certificates renew on their own: certbot wakes twice a day and renews anything
+inside its thirty-day window, and nginx reloads every six hours to pick up what
+it wrote. Neither needs the docker socket, which is why this stack doesn't mount
+it anywhere.
+
+What the production file does that the development one doesn't:
+
+- The app's port 8000 is not published. It sits on an `internal: true` network
+  with no route off the host, so nginx is the only thing that can reach it and
+  the app cannot make outbound connections at all. It has no reason to — the
+  model is baked into the image at build time.
+- `ONEREAD_COOKIE_SECURE=true` and `ONEREAD_ALLOWED_HOSTS` set to the domain.
+  Without the first, session cookies travel in the clear; without the second,
+  the app answers to any Host header that reaches it.
+- Proxy headers go back on, trusting the internal subnet and nothing else, and
+  nginx *overwrites* `X-Forwarded-For` with the real peer rather than appending
+  to it. The append form would let a client put an address of its choosing first
+  in the list — and first is what the rate limits are keyed on.
+- Read-only root filesystems, all capabilities dropped (nginx keeps the four it
+  needs to bind low ports and drop its workers to an unprivileged user), and
+  `no-new-privileges` everywhere.
+- TLS 1.2 and 1.3 with forward-secret AEAD ciphers only, session tickets off,
+  and HSTS added by nginx so it's on the 502s and 429s too. No `preload` — that
+  is a one-way door and belongs to whoever owns the domain.
+- Anything arriving on a name that isn't yours gets a closed connection on http
+  and a rejected handshake on https, so the host never confirms what it serves.
+- Rate limits at the edge on top of the app's own, so a sign-in flood is dropped
+  before it reaches the single worker.
+
+The two knobs that have to move together: `ONEREAD_MAX_UPLOAD_BYTES` in
+`.env.prod` and `client_max_body_size` in `deploy/nginx/nginx.conf`. Raise one
+without the other and nginx refuses uploads the app would have taken, with its
+own error page instead of the app's message.
 
 Once the people who need accounts have them, set
 `ONEREAD_ALLOW_REGISTRATION=false`. New user ids stop working, existing ones

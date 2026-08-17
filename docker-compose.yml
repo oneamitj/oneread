@@ -25,26 +25,10 @@ services:
           cpus: "4.0"
           memory: 3g
 
-  # Uncomment for automatic TLS on a real domain, then point DNS at this host
-  # and set ONEREAD_COOKIE_SECURE=true and ONEREAD_ALLOWED_HOSTS=your.domain.
-  #
-  # The app deliberately runs without --proxy-headers (see the Dockerfile), so
-  # behind a proxy every request arrives from the proxy's address: rate limits
-  # then share one bucket, which ONEREAD_LOGIN_PEER_FACTOR is there to widen.
-  # To get real client addresses back, override the command naming the proxy:
-  #   command: ["uvicorn", "oneread.main:app", "--host", "0.0.0.0", "--port", "8000",
-  #             "--workers", "1", "--proxy-headers", "--forwarded-allow-ips", "<caddy ip>"]
-  # Never "*" there — that lets any caller pick its own address, and with it a
-  # fresh rate-limit bucket on every request.
-  #
-  # caddy:
-  #   image: caddy:2-alpine
-  #   restart: unless-stopped
-  #   ports: ["80:80", "443:443"]
-  #   volumes:
-  #     - ./Caddyfile:/etc/caddy/Caddyfile:ro
-  #     - caddy-data:/data
-  #   depends_on: [app]
-
-# volumes:
-#   caddy-data:
+# This file is for running it on your own machine: one container, plain http,
+# port 8000 on the host. It is not the file to put on the internet.
+#
+# For that there is docker-compose.prod.yml — the same app behind an nginx that
+# terminates TLS, with certbot renewing the certificate, the app's port off the
+# host entirely, and proxy headers wired up so rate limits still see real
+# addresses. See "Putting it on the internet" in the README.

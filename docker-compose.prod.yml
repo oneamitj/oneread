@@ -1,0 +1,284 @@
+# Production stack: the app, an nginx that terminates TLS in front of it, and a
+# certbot that keeps the certificate current.
+#
+#   cp .env.prod.example .env.prod && $EDITOR .env.prod
+#   make prod-init      # data directory, first certificate, everything up
+#   make prod-update    # rebuild and roll forward
+#
+# `make` only exists here to spare you the flags. The real command is always
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod <...>
+
+name: oneread
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+# Applied to every service. `no-new-privileges` is the one that matters most:
+# it stops a setuid binary inside a container from being a route to root even
+# if one is found.
+x-hardening: &hardening
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+
+services:
+  app:
+    <<: *hardening
+    build:
+      context: .
+      dockerfile: Dockerfile
+      # So that `make prod-update` can clean up the image it just replaced
+      # without reaching for a host-wide `docker image prune`, which on a box
+      # running anything else is somebody else's images too.
+      labels:
+        me.amitj.oneread: "prod"
+    image: oneread:latest
+    restart: unless-stopped
+    logging: *logging
+
+    # No `ports:`. The app is reachable only from the internal network, which
+    # nginx is the sole other member of, so port 8000 is never on the host and
+    # never on the internet. Everything arrives through nginx or not at all.
+    networks:
+      internal:
+        ipv4_address: 10.83.7.20
+
+    volumes:
+      - ./data:/data
+
+    # Nothing outside /data and /tmp is ever written, so the rest of the
+    # filesystem is mounted read-only. Uploads spool through /tmp (starlette
+    # puts a multipart body on disk past 1 MB), which is why that one is a
+    # tmpfs rather than simply absent, and $HOME gets one too so that a library
+    # deciding to keep a cache in ~/.cache fails softly instead of at import.
+    #
+    # The model directory needs nothing: it is baked in at build time, owned by
+    # root and mode a+rX, so the app has never been able to write to it.
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=256m
+      - /home/oneread:rw,noexec,nosuid,size=32m
+
+    environment:
+      # Blank means a key is generated into /data and reused across restarts.
+      # Set it (openssl rand -base64 48) to keep the key out of the data
+      # directory. Changing it signs everyone out.
+      ONEREAD_SECRET_KEY: ${ONEREAD_SECRET_KEY:-}
+      # Both of these are what makes this stack different from the dev one.
+      # Without the first, session cookies travel in the clear; without the
+      # second, the app answers to any Host header that reaches it.
+      ONEREAD_COOKIE_SECURE: "true"
+      ONEREAD_ALLOWED_HOSTS: ${ONEREAD_DOMAIN:?set ONEREAD_DOMAIN in .env.prod}
+      # Empty on purpose: the frontend is served from the same origin as the
+      # API, so nothing cross-site is involved. The app refuses "*" outright.
+      ONEREAD_CORS_ORIGINS: ${ONEREAD_CORS_ORIGINS:-}
+      ONEREAD_ALLOW_REGISTRATION: ${ONEREAD_ALLOW_REGISTRATION:-true}
+      ONEREAD_MAX_TEXT_CHARS: ${ONEREAD_MAX_TEXT_CHARS:-100000}
+      ONEREAD_MAX_UPLOAD_BYTES: ${ONEREAD_MAX_UPLOAD_BYTES:-26214400}
+      ONEREAD_GENERATE_PER_HOUR: ${ONEREAD_GENERATE_PER_HOUR:-30}
+      ONEREAD_LOGIN_PER_MINUTE: ${ONEREAD_LOGIN_PER_MINUTE:-10}
+      ONEREAD_PRELOAD_MODEL: ${ONEREAD_PRELOAD_MODEL:-true}
+
+    # The image defaults to --no-proxy-headers, which is right when the port is
+    # exposed but wrong here. Behind nginx every request would otherwise appear
+    # to come from nginx's address, and the rate limits keyed on that address
+    # would share one bucket between everybody.
+    #
+    # So proxy headers go back on, trusting exactly the internal subnet below
+    # and nothing else — never "*", which would let any caller name its own
+    # address and mint a fresh rate-limit bucket per request. nginx overwrites
+    # X-Forwarded-For with the real peer rather than appending to it (see
+    # deploy/nginx/proxy_common.conf), so the value uvicorn reads here cannot
+    # be written by the client.
+    command:
+      - uvicorn
+      - oneread.main:app
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8000"
+      - --workers
+      - "1"
+      - --proxy-headers
+      - --forwarded-allow-ips
+      - 10.83.7.0/24
+
+    # The image's own healthcheck asks for /healthz on 127.0.0.1, which was
+    # right when the app answered to any Host. It doesn't here: naming
+    # ONEREAD_ALLOWED_HOSTS turns TrustedHostMiddleware on, and a request whose
+    # Host is `127.0.0.1` gets a 400 like any other stranger. Left alone the
+    # container would report unhealthy forever while serving perfectly well.
+    # So the probe introduces itself properly.
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - -fsS
+        - -H
+        - "Host: ${ONEREAD_DOMAIN}"
+        - http://127.0.0.1:8000/healthz
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      # The model is ~385 MB of ONNX and is loaded before the app answers.
+      start_period: 120s
+
+    # The synthesis queue is drained on shutdown with a 60s budget. Killing the
+    # container before that finishes loses whatever was mid-sentence.
+    stop_grace_period: 70s
+
+    deploy:
+      resources:
+        limits:
+          # Synthesis is CPU-bound and single-threaded per entry. Give it room
+          # or audio takes a while.
+          cpus: ${ONEREAD_CPUS:-4.0}
+          memory: ${ONEREAD_MEMORY:-3g}
+          pids: 512
+
+  nginx:
+    <<: *hardening
+    image: nginx:1.29-alpine
+    restart: unless-stopped
+    logging: *logging
+
+    # Root inside the container binds 80 and 443 and then drops the workers to
+    # the `nginx` user; those four capabilities are what that needs and nothing
+    # else survives the cap_drop above.
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+      - NET_BIND_SERVICE
+
+    ports:
+      - "80:80"
+      - "443:443"
+
+    networks:
+      edge:
+      internal:
+        ipv4_address: 10.83.7.10
+
+    volumes:
+      - ./deploy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./deploy/nginx/proxy_common.conf:/etc/nginx/proxy_common.conf:ro
+      # Rendered by the image's entrypoint into /etc/nginx/conf.d at start, with
+      # ONEREAD_DOMAIN substituted in. NGINX_ENVSUBST_FILTER below keeps it from
+      # eating nginx's own $variables.
+      - ./deploy/nginx/templates:/etc/nginx/templates:ro
+      - certbot-conf:/etc/letsencrypt:ro
+      - certbot-www:/var/www/certbot:ro
+
+    environment:
+      ONEREAD_DOMAIN: ${ONEREAD_DOMAIN:?set ONEREAD_DOMAIN in .env.prod}
+      NGINX_ENVSUBST_FILTER: "ONEREAD_"
+
+    read_only: true
+    tmpfs:
+      # Where the rendered config lands, and where request bodies and proxied
+      # responses are buffered. 512m on the cache because a 25 MB upload is
+      # buffered here in full before the single-worker app ever sees it.
+      - /etc/nginx/conf.d:rw,nosuid,size=1m
+      - /var/cache/nginx:rw,noexec,nosuid,size=512m
+      - /var/run:rw,noexec,nosuid,size=8m
+      - /tmp:rw,noexec,nosuid,size=16m
+
+    # Two things at once: nginx in the foreground, and a loop that reloads it
+    # every six hours so a certificate certbot renewed overnight is actually
+    # served. This is the reason the docker socket is not mounted anywhere in
+    # this file — certbot never needs to reach back into docker to restart us.
+    #
+    # The `exec /docker-entrypoint.sh` matters and is not decoration. The image's
+    # entrypoint only runs its setup scripts when its first argument is `nginx`,
+    # and one of those scripts is what renders templates/ into conf.d. Override
+    # the command without calling it back, and nginx comes up with an empty
+    # conf.d — which passes `nginx -t`, serves nothing, and looks fine in the
+    # logs. So the entrypoint is invoked here explicitly, exactly once.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        (while :; do sleep 6h; nginx -s reload 2>/dev/null || true; done) &
+        exec /docker-entrypoint.sh nginx -g 'daemon off;'
+
+    # service_started, not service_healthy: the app takes ~90s to load the model
+    # and TLS should not be down for that long on every deploy. nginx answers
+    # 502 until the app is up, which is the honest answer.
+    depends_on:
+      app:
+        condition: service_started
+
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1/nginx-health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          pids: 256
+
+  certbot:
+    <<: *hardening
+    image: certbot/certbot:latest
+    restart: unless-stopped
+    logging: *logging
+
+    volumes:
+      - certbot-conf:/etc/letsencrypt
+      - certbot-www:/var/www/certbot
+
+    # Needs the outside world to talk ACME. The app deliberately does not: it is
+    # only on `internal`, which has no route off the host at all.
+    networks:
+      - edge
+
+    # Wake twice a day, renew anything inside its 30-day window, go back to
+    # sleep. nginx picks up whatever this writes on its own six-hourly reload.
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        trap exit TERM
+        while :; do
+          certbot renew --webroot -w /var/www/certbot --quiet
+          sleep 12h & wait $${!}
+        done
+
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          pids: 128
+
+networks:
+  # Reaches the internet, and the internet reaches it. Only nginx and certbot
+  # are on it.
+  edge:
+    driver: bridge
+
+  # `internal: true` means no gateway: containers here cannot make outbound
+  # connections at all. The app has no reason to — the TTS model is baked into
+  # the image at build time — so this is free.
+  #
+  # The subnet is fixed so the addresses are stable across container recreation:
+  # nginx proxies to 10.83.7.20 by name-free address (deploy/nginx/templates),
+  # and the app trusts proxy headers from 10.83.7.0/24. Change it in one place
+  # and you must change it in all three.
+  internal:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 10.83.7.0/24
+
+volumes:
+  certbot-conf:
+  certbot-www:

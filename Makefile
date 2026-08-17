@@ -35,4 +35,56 @@ docker-up: ## Build the image and start it
 docker-down: ## Stop it
 	docker compose down
 
-.PHONY: help install dev-backend dev-frontend test lint build serve docker-up docker-down
+# --- production ---------------------------------------------------------------
+# The stack in docker-compose.prod.yml: the app behind nginx, with certbot
+# keeping the certificate current. Everything reads .env.prod.
+PROD := docker compose -f docker-compose.prod.yml --env-file .env.prod
+
+prod-init: ## First run: data dir, first certificate, then bring it all up
+	./scripts/prod-bootstrap.sh
+
+prod-update: ## Rebuild and roll forward (this is the deploy)
+	$(PROD) up -d --build --remove-orphans
+	$(PROD) image prune -f
+
+prod-logs: ## Follow the logs
+	$(PROD) logs -f --tail=100
+
+prod-ps: ## What's running, and is it healthy
+	$(PROD) ps
+
+prod-restart: ## Restart the app without touching nginx or the certificate
+	$(PROD) restart app
+
+prod-down: ## Stop everything (the data and the certificate survive)
+	$(PROD) down
+
+prod-cert-renew: ## Renew the certificate now instead of waiting for the timer
+	$(PROD) run --rm --entrypoint certbot certbot renew --webroot -w /var/www/certbot --force-renewal
+	$(PROD) exec nginx nginx -s reload
+
+prod-nginx-check: ## Parse the nginx config as the running container sees it
+	$(PROD) exec nginx nginx -t
+
+# A plain tar of a live SQLite file can catch it mid-write and restore as a
+# corrupt database, so the database is snapshotted through SQLite's own online
+# backup first and the live files are left out of the archive. Restoring means
+# moving backup/oneread.db back up a level — see the README.
+prod-backup: ## Snapshot ./data into backups/, database included consistently
+	@mkdir -p backups
+	$(PROD) exec -T app python -c "import pathlib, sqlite3; \
+pathlib.Path('/data/backup').mkdir(exist_ok=True); \
+src = sqlite3.connect('file:/data/oneread.db?mode=ro', uri=True); \
+dst = sqlite3.connect('/data/backup/oneread.db'); \
+src.backup(dst); dst.close(); src.close()"
+	tar -czf "backups/oneread-$$(date +%Y%m%d-%H%M%S).tar.gz" \
+		--exclude='data/oneread.db' \
+		--exclude='data/oneread.db-wal' \
+		--exclude='data/oneread.db-shm' \
+		data
+	$(PROD) exec -T app rm -rf /data/backup
+	@ls -lh backups | tail -1
+
+.PHONY: help install dev-backend dev-frontend test lint build serve docker-up docker-down \
+        prod-init prod-update prod-logs prod-ps prod-restart prod-down \
+        prod-cert-renew prod-nginx-check prod-backup

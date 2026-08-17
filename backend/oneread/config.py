@@ -114,6 +114,19 @@ class Settings(BaseSettings):
     # --- frontend -----------------------------------------------------------
     static_dir: Path = Path("./frontend/dist")
 
+    # --- public site --------------------------------------------------------
+    #: The address this instance answers on, e.g. https://oneread.example. Used
+    #: for the canonical link, the sitemap and the absolute URLs in the share
+    #: cards. Empty means "don't claim an address", and the pages fall back to
+    #: relative links.
+    public_url: str = ""
+    #: Whether this instance is meant to be found. Off by default, because most
+    #: of them are somebody's laptop or a box on a home network: robots.txt then
+    #: refuses every crawler, /about carries `noindex`, and /sitemap.xml is a
+    #: 404. Turn it on for an instance you actually want in search results and
+    #: in the answers assistants give.
+    public_site: bool = False
+
     @field_validator("log_level")
     @classmethod
     def _known_level(cls, value: str) -> str:
@@ -124,6 +137,12 @@ class Settings(BaseSettings):
                 "INFO, WARNING, ERROR, CRITICAL."
             )
         return level
+
+    @field_validator("public_url")
+    @classmethod
+    def _no_trailing_slash(cls, value: str) -> str:
+        """So that `public_url + "/about"` never comes out with two slashes."""
+        return value.strip().rstrip("/")
 
     @field_validator("sample_minute_choices", mode="before")
     @classmethod

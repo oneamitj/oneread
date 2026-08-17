@@ -4,10 +4,13 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="color-scheme" content="light dark" />
-    <meta name="description" content="A private library of things you'd rather listen to." />
+    <meta
+      name="description"
+      content="Self-hosted text-to-speech. Drop in a PDF, Word file or Markdown, pick a voice, get back a WAV with matching subtitles. Runs offline, costs nothing per character."
+    />
     <meta name="theme-color" content="#eef1f7" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#0b0c10" media="(prefers-color-scheme: dark)" />
-    <title>oneread</title>
+    <title>oneread: private text-to-speech library</title>
 
     <link rel="icon" href="/favicon.ico" sizes="48x48" />
     <link rel="icon" type="image/png" href="/favicon-32x32.png" sizes="32x32" />
@@ -15,11 +18,26 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
 
-    <meta property="og:title" content="Oneread" />
-    <meta property="og:description" content="A private library of things you'd rather listen to." />
+    <!-- The canonical link, og:url and the robots meta are added by the app at
+         startup, from ONEREAD_PUBLIC_URL and ONEREAD_PUBLIC_SITE: a static
+         build can't know what name it will be served under. See _shell() in
+         backend/oneread/main.py. -->
+    <meta property="og:site_name" content="oneread" />
+    <meta property="og:title" content="oneread: private text-to-speech library" />
+    <meta
+      property="og:description"
+      content="Paste text or drop in a document, pick a voice, get back audio with subtitles timed to it. Synthesis runs on your own machine."
+    />
     <meta property="og:image" content="/og-image.png" />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="oneread: private text-to-speech library" />
+    <meta
+      name="twitter:description"
+      content="Paste text or drop in a document, pick a voice, get back audio with subtitles timed to it. Synthesis runs on your own machine."
+    />
+    <meta name="twitter:image" content="/og-image.png" />
+    <link rel="alternate" type="text/plain" href="/llms.txt" title="llms.txt" />
   </head>
   <body>
     <div id="root"></div>

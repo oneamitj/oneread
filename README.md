@@ -1,7 +1,8 @@
 # oneread
 
-A private text-to-speech library. Paste text or drop in a file, pick a voice, get
-back a wav with subtitles timed to the audio.
+A self-hosted, offline text-to-speech library. Paste text or drop in a PDF, Word
+file, slide deck or markdown, pick a voice, and get back a wav with subtitles
+timed to the audio.
 
 Speech comes from [Supertonic 3](https://github.com/supertone-inc/supertonic),
 running as ONNX inside the app. No API keys, nothing leaves the machine, no
@@ -67,7 +68,7 @@ make install
 make dev-backend     # API on :8000
 make dev-frontend    # Vite on :5173, proxying /api
 make serve           # build the frontend, serve everything from :8000
-make test            # 169 tests, no model needed
+make test            # 184 tests, no model needed
 make lint
 ```
 
@@ -147,6 +148,34 @@ and nginx refuses uploads the app would have taken.
 
 Set `ONEREAD_ALLOW_REGISTRATION=false` once the accounts that need to exist do.
 
+### Being found, or not
+
+The app itself is behind a sign-in, so a crawler that reaches `/` sees an empty
+div and nothing else. What it can read is `/about`, which the server renders as
+plain HTML: what oneread does, how to run it, and the questions people ask,
+carrying FAQ and SoftwareApplication structured data. `/llms.txt` and
+`/llms-full.txt` are the same facts in markdown, for assistants that fetch a
+project's own account of itself instead of reconstructing one.
+
+None of that is switched on by default, because most instances of this are
+somebody's laptop. Until you say otherwise, `robots.txt` refuses every crawler,
+`/about` carries a `noindex`, and `/sitemap.xml` is a 404.
+
+```sh
+ONEREAD_PUBLIC_SITE=true
+ONEREAD_PUBLIC_URL=https://oneread.example
+```
+
+Setting both gives you a real `robots.txt` (with `/api/` and `/e/` still shut,
+since one is the app's own plumbing and the other is somebody's private
+library), a sitemap, and canonical links. The assistant crawlers are named one
+by one in `backend/oneread/routers/site.py`, GPTBot and ClaudeBot and the rest.
+Delete a name from that list to keep this instance out of that model's index.
+
+The copy those pages are built from lives in `backend/oneread/seo.py`, one list
+of features and one list of questions. The page, the structured data and the
+llms files are all rendered from it, so there is no second copy to update.
+
 **No horizontal scale.** The model sits in one process's memory and synthesis
 runs on a single thread, so run one worker and give it CPU. Watch disk too: an
 hour of audio is about 300 MB.
@@ -168,6 +197,8 @@ Every setting is an environment variable prefixed `ONEREAD_`, or a line in
 | `ONEREAD_PREVIEW_PER_HOUR` | `120` | Voice samples, per user. |
 | `ONEREAD_TEXT_PER_MINUTE` | `120` | Routes that reflow text without making audio. |
 | `ONEREAD_CORS_ORIGINS` | empty | Only for a frontend on another origin. `*` is refused. |
+| `ONEREAD_PUBLIC_SITE` | `false` | Let crawlers in, and drop the `noindex` from `/about`. |
+| `ONEREAD_PUBLIC_URL` | empty | This instance's address, for canonical links and the sitemap. |
 | `ONEREAD_TTS_STEPS` | `8` | More steps, slightly better audio, more CPU. |
 | `ONEREAD_PRELOAD_MODEL` | `true` | Load ONNX at startup. |
 
@@ -187,7 +218,8 @@ backend/oneread/
   tts_engine.py       Supertonic held open, per-segment synthesis, cue timings
   subtitles.py        cues into SRT and WebVTT
   worker.py           the job queue and its one thread
-  routers/            auth, entries, renditions, meta, preview, uploads
+  seo.py              the copy /about and llms.txt are both built from
+  routers/            auth, entries, renditions, meta, preview, uploads, site
 frontend/src/
   screens/            AuthGate, Library, EntryPage
   components/         cards, players, editor, pickers
@@ -228,6 +260,9 @@ the system light/dark setting.
 | `POST /api/preview/text` | The flattened text, no synthesis |
 | `GET /api/meta` | Voices, languages, limits |
 | `GET /healthz` | |
+| `GET /about` | Server-rendered, no sign-in. What this is, for people and crawlers |
+| `GET /robots.txt`, `/sitemap.xml` | Gated on `ONEREAD_PUBLIC_SITE` |
+| `GET /llms.txt`, `/llms-full.txt` | The same page as markdown, for assistants |
 
 Writes require the header `X-Requested-With: oneread`, which a cross-site form
 cannot set. Passwords are argon2; the session cookie is HttpOnly and signed;

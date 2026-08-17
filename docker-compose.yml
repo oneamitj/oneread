@@ -16,6 +16,10 @@ services:
       ONEREAD_COOKIE_SECURE: ${ONEREAD_COOKIE_SECURE:-false}
       ONEREAD_ALLOWED_HOSTS: ${ONEREAD_ALLOWED_HOSTS:-*}
       ONEREAD_ALLOW_REGISTRATION: ${ONEREAD_ALLOW_REGISTRATION:-true}
+      # Off here on purpose: this file is somebody's own machine, and robots.txt
+      # accordingly tells every crawler to go away.
+      ONEREAD_PUBLIC_SITE: ${ONEREAD_PUBLIC_SITE:-false}
+      ONEREAD_PUBLIC_URL: ${ONEREAD_PUBLIC_URL:-}
       ONEREAD_MAX_TEXT_CHARS: ${ONEREAD_MAX_TEXT_CHARS:-100000}
       ONEREAD_GENERATE_PER_HOUR: ${ONEREAD_GENERATE_PER_HOUR:-30}
     # Synthesis is CPU-bound. Give it room, or audio takes a while.

@@ -74,7 +74,10 @@ export function AuthGate({ onSignedIn }: Props) {
         </button>
 
         <p className="hint gate__foot">
-          Everything is generated and stored on this machine. Nothing is sent anywhere else.
+          Everything is generated and stored on this machine. Nothing is sent anywhere else.{" "}
+          {/* A real link, not a router push: /about is rendered by the server,
+              which is the only version a crawler that skips JavaScript sees. */}
+          <a href="/about">What this is</a>
         </p>
       </form>
     </main>

@@ -77,6 +77,12 @@ services:
       # API, so nothing cross-site is involved. The app refuses "*" outright.
       ONEREAD_CORS_ORIGINS: ${ONEREAD_CORS_ORIGINS:-}
       ONEREAD_ALLOW_REGISTRATION: ${ONEREAD_ALLOW_REGISTRATION:-true}
+      # Whether this instance should be findable: a real robots.txt with a
+      # sitemap, and no noindex on /about. The URL defaults to the domain above,
+      # since that is the only name this stack answers to anyway. It has to be
+      # spelled out rather than read from a Host header, which the caller writes.
+      ONEREAD_PUBLIC_SITE: ${ONEREAD_PUBLIC_SITE:-false}
+      ONEREAD_PUBLIC_URL: ${ONEREAD_PUBLIC_URL:-https://${ONEREAD_DOMAIN}}
       ONEREAD_MAX_TEXT_CHARS: ${ONEREAD_MAX_TEXT_CHARS:-100000}
       ONEREAD_MAX_UPLOAD_BYTES: ${ONEREAD_MAX_UPLOAD_BYTES:-26214400}
       ONEREAD_GENERATE_PER_HOUR: ${ONEREAD_GENERATE_PER_HOUR:-30}

@@ -7,12 +7,12 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from .auth import SessionRefreshMiddleware
@@ -23,6 +23,7 @@ from .routers import entries as entries_router
 from .routers import meta as meta_router
 from .routers import preview as preview_router
 from .routers import renditions as rendition_router
+from .routers import site as site_router
 from .routers import uploads as upload_router
 from .security import BodyLimitMiddleware, SecurityHeadersMiddleware
 from .worker import get_worker
@@ -122,13 +123,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(rendition_router.router)
     app.include_router(preview_router.router)
     app.include_router(upload_router.router)
+    # Before the frontend, whose catch-all would otherwise swallow /about,
+    # /robots.txt and the rest and answer them with the React shell.
+    app.include_router(site_router.router)
 
-    _mount_frontend(app, settings.static_dir)
+    _mount_frontend(app, settings)
     return app
 
 
-def _mount_frontend(app: FastAPI, static_dir: Path) -> None:
+def _mount_frontend(app: FastAPI, settings: Settings) -> None:
     """Serve the Vite build, with every unknown path falling back to index.html."""
+    static_dir = settings.static_dir
     index = static_dir / "index.html"
     if not index.is_file():
         log.warning("no frontend build at %s; serving the API only", static_dir)
@@ -138,12 +143,42 @@ def _mount_frontend(app: FastAPI, static_dir: Path) -> None:
     if assets.is_dir():
         app.mount("/assets", StaticFiles(directory=assets), name="assets")
 
+    shell = _shell(index, settings)
+
     @app.get("/{path:path}", include_in_schema=False)
-    async def spa(path: str) -> FileResponse:
+    async def spa(path: str) -> Response:
         candidate = (static_dir / path).resolve()
         if path and static_dir.resolve() in candidate.parents and candidate.is_file():
             return FileResponse(candidate)
-        return FileResponse(index, headers={"Cache-Control": "no-cache"})
+        return HTMLResponse(shell, headers={"Cache-Control": "no-cache"})
+
+
+def _shell(index: Path, settings: Settings) -> str:
+    """index.html with this instance's own address written into it.
+
+    The Vite build is a static file and cannot know what name it will be served
+    under, so the canonical link and the absolute URLs that link previews need
+    are filled in here, once, at startup. An instance with no
+    ONEREAD_PUBLIC_URL keeps the relative tags the build shipped with, and one
+    that isn't meant to be found says so in a robots meta as well as in
+    robots.txt, since the two are read by different things at different times.
+    """
+    html = index.read_text(encoding="utf-8")
+    head: list[str] = []
+
+    if settings.public_url:
+        origin = settings.public_url
+        html = html.replace('content="/og-image.png"', f'content="{origin}/og-image.png"')
+        head.append(f'<link rel="canonical" href="{origin}/" />')
+        head.append(f'<meta property="og:url" content="{origin}/" />')
+
+    head.append(
+        '<meta name="robots" content="index, follow, max-image-preview:large" />'
+        if settings.public_site
+        else '<meta name="robots" content="noindex, nofollow" />'
+    )
+
+    return html.replace("</head>", "    " + "\n    ".join(head) + "\n  </head>", 1)
 
 
 def _install_error_handlers(app: FastAPI) -> None:

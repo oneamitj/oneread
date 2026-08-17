@@ -157,7 +157,7 @@ def revoke_sessions(
     session: Annotated[Session, Depends(get_session)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> Response:
-    """Sign out everywhere else.
+    """Sign out all sessions.
 
     Signing out normally only clears the cookie in the browser doing it, which is
     the right thing when you're closing one tab and no help at all when a laptop

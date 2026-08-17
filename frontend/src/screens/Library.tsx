@@ -46,7 +46,7 @@ export function Library({ user, meta, onSignOut, onOpen, revision }: Props) {
   const revokeSessions = useCallback(async () => {
     try {
       await api.revokeSessions();
-      setNotice("Signed out everywhere else. This browser is still signed in.");
+      setNotice("Signed out all sessions. This browser is still signed in.");
     } catch (problem) {
       if (problem instanceof ApiError && problem.status === 401) onSignOut();
       else setNotice(problem instanceof ApiError ? problem.message : "Couldn't do that.");
@@ -156,7 +156,7 @@ export function Library({ user, meta, onSignOut, onOpen, revision }: Props) {
             <div className="menu__pop glass glass--thin">
               <button type="button" onClick={onSignOut}>Sign out</button>
               <button type="button" onClick={() => void revokeSessions()}>
-                Sign out everywhere else
+                Sign out all sessions
               </button>
             </div>
           </details>

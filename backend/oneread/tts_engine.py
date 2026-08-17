@@ -1,0 +1,302 @@
+"""Supertonic, loaded once in this process, plus the job queue that feeds it.
+
+Everything here is synchronous and thread-bound on purpose. ONNX Runtime
+already spreads one inference across cores, so a second concurrent job would
+mostly fight the first for CPU. One worker thread, one job at a time.
+"""
+
+from __future__ import annotations
+
+import logging
+import threading
+from collections.abc import Callable
+from dataclasses import dataclass
+from pathlib import Path
+
+import numpy as np
+import soundfile as sf
+
+from .config import Settings, get_settings
+from .segmenter import max_chars_for, segment_text
+
+log = logging.getLogger("oneread.tts")
+
+VOICES: list[dict[str, str]] = [
+    {"id": "F1", "label": "Faye", "gender": "female"},
+    {"id": "F2", "label": "Iris", "gender": "female"},
+    {"id": "F3", "label": "June", "gender": "female"},
+    {"id": "F4", "label": "Nora", "gender": "female"},
+    {"id": "F5", "label": "Sage", "gender": "female"},
+    {"id": "M1", "label": "Abel", "gender": "male"},
+    {"id": "M2", "label": "Cole", "gender": "male"},
+    {"id": "M3", "label": "Emil", "gender": "male"},
+    {"id": "M4", "label": "Otto", "gender": "male"},
+    {"id": "M5", "label": "Reid", "gender": "male"},
+]
+VOICE_IDS = {voice["id"] for voice in VOICES}
+
+MIN_SPEED = 0.7
+MAX_SPEED = 2.0
+
+
+class SynthesisError(RuntimeError):
+    """Raised when a piece of text cannot be spoken."""
+
+
+class Cancelled(RuntimeError):
+    """Raised when a job is thrown away part-way, usually because it was edited."""
+
+
+# What a stop hook can ask for.
+KEEP = "keep"  # finish the file here; the audio so far is worth having
+DISCARD = "discard"  # bin it, nobody wants a stale half-reading
+
+# (segments done, segments total, seconds of audio written so far)
+ProgressHook = Callable[[int, int, float], None]
+StopHook = Callable[[], str | None]
+
+
+@dataclass(frozen=True)
+class Synthesis:
+    duration_s: float
+    cues: list[dict]
+    sample_rate: int
+    segments_done: int = 0
+    segments_total: int = 0
+    spoken_chars: int = 0
+    #: Sentences in the whole document, so a reading knows what share it covers.
+    document_segments: int = 0
+    #: The first sentence, for telling two recordings apart at a glance.
+    opening: str = ""
+    #: False when a limit was hit or someone pressed stop.
+    complete: bool = True
+    #: Why it ended: "complete", "limit" (a sample reached its cap), or "stopped".
+    reason: str = "complete"
+
+
+class TTSEngine:
+    """Thin wrapper over `supertonic.TTS` with the model held open."""
+
+    def __init__(self, settings: Settings | None = None) -> None:
+        self.settings = settings or get_settings()
+        self._tts = None
+        self._styles: dict[str, object] = {}
+        self._lock = threading.Lock()
+        # Held for one segment at a time. Two callers (the queue worker and a
+        # voice preview) then take turns instead of thrashing every core, and a
+        # preview waits one sentence rather than a whole entry.
+        self._infer_lock = threading.Lock()
+
+    # --- lifecycle ----------------------------------------------------------
+
+    def load(self) -> None:
+        with self._lock:
+            if self._tts is not None:
+                return
+            from supertonic import TTS
+
+            log.info("loading supertonic model")
+            self._tts = TTS(auto_download=True)
+            log.info("model ready, sample rate %s Hz", self._tts.sample_rate)
+
+    @property
+    def tts(self):
+        if self._tts is None:
+            self.load()
+        return self._tts
+
+    @property
+    def sample_rate(self) -> int:
+        return int(self.tts.sample_rate)
+
+    def languages(self) -> list[str]:
+        from supertonic.config import AVAILABLE_LANGUAGES
+
+        return list(AVAILABLE_LANGUAGES)
+
+    def _style(self, voice: str):
+        if voice not in VOICE_IDS:
+            raise SynthesisError(f"Unknown voice {voice!r}.")
+        with self._lock:
+            style = self._styles.get(voice)
+            if style is None:
+                style = self.tts.get_voice_style(voice)
+                self._styles[voice] = style
+            return style
+
+    # --- synthesis ----------------------------------------------------------
+
+    def check_text(self, text: str) -> list[str]:
+        """Return characters the model has no pronunciation for."""
+        ok, unsupported = self.tts.model.text_processor.validate_text(text)
+        return [] if ok else list(unsupported)
+
+    def synthesize_to_file(
+        self,
+        text: str,
+        *,
+        voice: str,
+        lang: str,
+        speed: float,
+        out_path: Path,
+        limit_s: float | None = None,
+        start_segment: int = 0,
+        end_segment: int | None = None,
+        on_progress: ProgressHook | None = None,
+        should_stop: StopHook | None = None,
+    ) -> Synthesis:
+        """Speak `text` into `out_path` and report where each sentence lands.
+
+        `TTS.synthesize` throws away per-chunk timings, so this walks the
+        segments itself and calls the model directly. Cue boundaries then come
+        from the sample count of the audio actually written, not from the
+        duration predictor, which is what keeps subtitles in step with speech.
+
+        Audio goes to disk a sentence at a time. A book-length entry is hours of
+        samples, and holding those in a list to concatenate at the end would cost
+        gigabytes; streaming keeps memory flat however long the document is, and
+        it means a reading that stops early still leaves a playable file.
+
+        `limit_s` stops once that many seconds of audio exist, which is how the
+        first few minutes get made without reading the whole book.
+        `start_segment` and `end_segment` read a slice of it instead, counted in
+        sentences so a range always begins and ends on a whole one.
+        """
+        text = text.strip()
+        if not text:
+            raise SynthesisError("There is no text to read.")
+
+        unsupported = self.check_text(text)
+        if unsupported:
+            shown = " ".join(repr(c) for c in unsupported[:8])
+            raise SynthesisError(f"These characters can't be spoken: {shown}")
+
+        tts = self.tts
+        effective_lang = lang if tts.is_multilingual else None
+        if tts.is_multilingual:
+            from supertonic.config import AVAILABLE_LANGUAGES
+
+            if lang not in AVAILABLE_LANGUAGES:
+                raise SynthesisError(f"Unknown language {lang!r}.")
+
+        style = self._style(voice)
+        steps = self.settings.tts_steps
+        gap_samples = int(self.settings.silence_between_segments_s * tts.sample_rate)
+        silence = np.zeros(gap_samples, dtype=np.float32)
+
+        every_segment = segment_text(text, lang=lang)
+        start_segment = max(0, min(start_segment, len(every_segment)))
+        segments = every_segment[start_segment:end_segment]
+        if not segments:
+            raise SynthesisError("That range doesn't cover any text.")
+        limit = max_chars_for(lang)
+
+        cues: list[dict] = []
+        cursor = 0  # samples written so far
+        spoken_chars = 0
+        done = 0
+        complete = True
+        reason = "complete"
+
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path = out_path.with_suffix(".partial.wav")
+
+        try:
+            with sf.SoundFile(
+                str(tmp_path),
+                mode="w",
+                samplerate=tts.sample_rate,
+                channels=1,
+                subtype="PCM_16",
+            ) as sink:
+                for index, segment in enumerate(segments):
+                    stop = should_stop() if should_stop is not None else None
+                    if stop == DISCARD:
+                        raise Cancelled()
+                    if stop == KEEP:
+                        complete = False
+                        reason = "stopped"
+                        break
+
+                    if len(segment) > limit:  # the segmenter promises this already
+                        segment = segment[:limit]
+                    with self._infer_lock:
+                        wav, _predicted = tts.model(
+                            [segment], style, steps, speed, effective_lang
+                        )
+                    if wav.shape[0] != 1:
+                        raise SynthesisError(f"Model returned an odd shape: {wav.shape}")
+
+                    start = cursor / tts.sample_rate
+                    cursor += wav.shape[1]
+                    end = cursor / tts.sample_rate
+                    cues.append(
+                        {
+                            "i": start_segment + index,
+                            "start": round(start, 3),
+                            "end": round(end, 3),
+                            "text": segment,
+                        }
+                    )
+                    sink.write(wav.squeeze(axis=0))
+                    spoken_chars += len(segment)
+                    done = index + 1
+
+                    if limit_s is not None and end >= limit_s:
+                        complete = done >= len(segments)
+                        reason = "complete" if complete else "limit"
+                        if on_progress is not None:
+                            on_progress(done, len(segments), end)
+                        break
+
+                    if index < len(segments) - 1 and gap_samples:
+                        sink.write(silence)
+                        cursor += gap_samples
+
+                    if on_progress is not None:
+                        on_progress(done, len(segments), end)
+        except Cancelled:
+            tmp_path.unlink(missing_ok=True)
+            raise
+        except BaseException:
+            tmp_path.unlink(missing_ok=True)
+            raise
+
+        if not cues:
+            tmp_path.unlink(missing_ok=True)
+            raise Cancelled()  # stopped before a single sentence was read
+
+        tmp_path.replace(out_path)
+
+        covers_everything = start_segment == 0 and len(segments) == len(every_segment)
+        return Synthesis(
+            duration_s=round(cursor / tts.sample_rate, 3),
+            cues=cues,
+            sample_rate=int(tts.sample_rate),
+            segments_done=done,
+            segments_total=len(segments),
+            spoken_chars=spoken_chars,
+            document_segments=len(every_segment),
+            opening=cues[0]["text"][:160] if cues else "",
+            complete=complete and covers_everything,
+            reason=reason,
+        )
+
+
+_engine: TTSEngine | None = None
+_engine_lock = threading.Lock()
+
+
+def get_engine() -> TTSEngine:
+    global _engine
+    with _engine_lock:
+        if _engine is None:
+            _engine = TTSEngine()
+        return _engine
+
+
+def set_engine(engine: TTSEngine) -> None:
+    """Test hook: swap in a fake so the suite never loads 385 MB of ONNX."""
+    global _engine
+    with _engine_lock:
+        _engine = engine

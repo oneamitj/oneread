@@ -1,0 +1,1540 @@
+/* Screen layout: the gate, the library, the sheet, the card, the player. */
+
+.boot {
+  display: grid;
+  place-items: center;
+  height: 100dvh;
+  color: var(--ink-3);
+  letter-spacing: 0.02em;
+}
+
+/* --- sign in ------------------------------------------------------------ */
+
+.gate {
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+  padding: var(--s-5);
+}
+
+.gate__card {
+  width: min(26rem, 100%);
+  padding: var(--s-6);
+  animation: rise var(--t-slow) var(--spring) both;
+}
+
+.gate__mark {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 680;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.gate__mark img {
+  display: block;
+  width: 9.5rem;
+  height: auto;
+}
+
+.gate__lede {
+  margin: var(--s-2) 0 var(--s-5);
+  color: var(--ink-2);
+  font-size: 0.9375rem;
+}
+
+.gate .label { margin-top: var(--s-4); }
+.gate__go { width: 100%; margin-top: var(--s-5); padding-block: 0.65rem; }
+.gate__foot { margin: var(--s-4) 0 0; text-align: center; }
+
+@keyframes rise {
+  from { opacity: 0; transform: translate3d(0, 12px, 0) scale(0.985); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* --- shell -------------------------------------------------------------- */
+
+.shell {
+  min-height: 100dvh;
+  padding: var(--s-4) var(--s-4) var(--s-7);
+  max-width: 88rem;
+  margin-inline: auto;
+}
+
+/* Chrome floats and content scrolls under it. */
+.topbar {
+  position: sticky;
+  top: var(--s-3);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: var(--s-4);
+  padding: var(--s-2) var(--s-3);
+  border-radius: var(--r-pill);
+  flex-wrap: wrap;
+}
+
+.topbar__brand { display: flex; align-items: center; padding-inline: var(--s-2); }
+
+.topbar__mark {
+  display: block;
+  width: auto;
+  height: 1.75rem;
+}
+
+.topbar__search {
+  display: flex;
+  align-items: center;
+  gap: var(--s-2);
+  flex: 1 1 16rem;
+  min-width: 0;
+  padding: 0.3rem 0.5rem 0.3rem 0.75rem;
+  border-radius: var(--r-pill);
+  background: var(--glass-thin);
+  border: 1px solid var(--hairline);
+}
+
+.topbar__glyph { color: var(--ink-3); flex: none; }
+
+.topbar__field {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  padding: 0.25rem 0;
+}
+.topbar__field:focus { outline: none; }
+.topbar__field::-webkit-search-cancel-button { display: none; }
+
+.topbar__right { display: flex; align-items: center; gap: var(--s-2); }
+
+.usermenu { position: relative; }
+.usermenu summary { list-style: none; cursor: pointer; }
+.usermenu summary::-webkit-details-marker { display: none; }
+.usermenu .menu__pop { right: 0; }
+
+.tagbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-2);
+  padding: var(--s-4) var(--s-3) 0;
+}
+
+.notice {
+  margin: var(--s-4) var(--s-3) 0;
+  padding: var(--s-3) var(--s-4);
+  border-radius: var(--r-md);
+  color: var(--bad);
+  font-size: 0.9375rem;
+}
+
+/* --- grid --------------------------------------------------------------- */
+
+.grid {
+  display: grid;
+  gap: var(--s-4);
+  grid-template-columns: repeat(auto-fill, minmax(min(24rem, 100%), 1fr));
+  /* Every card the same size: 1fr columns already match the widths, and
+     equal rows plus stretch match the heights, so the shelf is a shelf
+     rather than a skyline. */
+  grid-auto-rows: 1fr;
+  align-items: stretch;
+  padding: var(--s-5) var(--s-3) 0;
+}
+
+.grid__msg { grid-column: 1 / -1; text-align: center; padding: var(--s-7) 0; }
+
+.empty {
+  grid-column: 1 / -1;
+  justify-self: center;
+  max-width: 32rem;
+  text-align: center;
+  padding: var(--s-7) var(--s-5);
+  border-radius: var(--r-lg);
+}
+
+.empty h2 {
+  margin: 0 0 var(--s-2);
+  font-size: 1.25rem;
+  letter-spacing: -0.01em;
+}
+.empty .btn { margin-top: var(--s-5); }
+
+/* --- card: a tile, not a workspace ------------------------------------- */
+
+.card {
+  padding: var(--s-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+  cursor: pointer;
+  animation: rise var(--t-base) var(--ease-out) both;
+  transition: transform var(--t-fast) var(--ease-out),
+    box-shadow var(--t-fast) var(--ease-out);
+}
+
+.card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+.card:active { transform: translateY(0) scale(0.995); }
+
+.card__title {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 620;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+  /* Two lines, always: a one-line title beside a two-line one would sit its
+     player a whole line higher, and the row stops reading as a row. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: calc(2 * 1.25 * 1.0625rem);
+}
+
+.card__excerpt {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  /* Two lines, then it stops. The whole text lives on the entry's page. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  /* Both lines are reserved whether or not the text fills them, so a
+     one-line entry doesn't sit its player higher than its neighbour's. */
+  min-height: calc(2 * 1.55 * 0.9375rem);
+}
+
+/* A player, a progress bar and an error line are three different heights.
+   Giving them one slot keeps everything below them on the same line. */
+.card__slot {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 2rem;
+}
+
+.card__working { display: flex; flex-direction: column; gap: var(--s-2); margin: 0; }
+
+.card__tags { display: flex; flex-wrap: wrap; gap: var(--s-2); min-height: 1.75rem; }
+
+.card__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+  /* Pinned to the bottom, so every card's footer meets the same line. */
+  margin-top: auto;
+  padding-top: var(--s-1);
+}
+
+.card__meta {
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+}
+
+.card.is-locked { box-shadow: var(--shadow-md), 0 0 0 1px rgba(178, 106, 0, 0.35); }
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  flex: none;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--r-pill);
+  background: var(--accent-tint);
+  color: var(--ink-2);
+  align-self: flex-start;
+}
+.status--ready { color: var(--good); background: rgba(31, 157, 85, 0.14); }
+.status--failed { color: var(--bad); background: rgba(208, 52, 44, 0.14); }
+
+.status__pulse {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: pulse 1.6s var(--ease-in-out) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}
+
+/* --- the one control a card gets ---------------------------------------- */
+
+.mini { display: flex; align-items: center; gap: var(--s-3); }
+
+.mini__play {
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-ink);
+  cursor: pointer;
+  box-shadow: 0 1px 6px rgba(10, 90, 200, 0.28);
+  transition: transform var(--t-fast) var(--ease-out), background var(--t-fast) var(--ease-out);
+}
+.mini__play:hover { background: var(--accent-strong); }
+.mini__play:active { transform: scale(0.92); }
+
+.mini__line {
+  flex: 1;
+  height: 3px;
+  border-radius: var(--r-pill);
+  background: var(--hairline);
+  overflow: hidden;
+}
+
+.mini__fill {
+  height: 100%;
+  background: var(--accent);
+  transform-origin: left center;
+  will-change: transform;
+}
+
+.mini__time {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--ink-3);
+}
+
+/* --- menus -------------------------------------------------------------- */
+
+.menu__pop {
+  position: absolute;
+  top: calc(100% + var(--s-2));
+  right: 0;
+  z-index: 30;
+  min-width: 11rem;
+  padding: var(--s-1);
+  border-radius: var(--r-md);
+  display: flex;
+  flex-direction: column;
+  animation: pop var(--t-fast) var(--ease-out) both;
+  transform-origin: top right;
+}
+
+.menu__pop a,
+.menu__pop button {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding: 0.45rem 0.65rem;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  color: inherit;
+  text-decoration: none;
+  text-align: left;
+  cursor: pointer;
+  font-size: 0.9375rem;
+}
+
+.menu__pop a:hover,
+.menu__pop button:hover { background: var(--accent-tint); }
+
+@keyframes pop {
+  from { opacity: 0; transform: scale(0.96) translateY(-4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* --- player ------------------------------------------------------------- */
+
+.player {
+  border-radius: var(--r-md);
+  background: var(--glass-thin);
+  border: 1px solid var(--hairline);
+  padding: var(--s-3);
+}
+
+.player__row { display: flex; align-items: center; gap: var(--s-3); }
+
+.player__play {
+  flex: none;
+  width: 2.5rem;
+  height: 2.5rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 0;
+  background: var(--accent);
+  color: var(--accent-ink);
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(10, 90, 200, 0.3);
+  transition: transform var(--t-fast) var(--ease-out), background var(--t-fast) var(--ease-out);
+}
+.player__play:active { transform: scale(0.93); }
+.player__play:hover { background: var(--accent-strong); }
+
+.player__body { flex: 1; min-width: 0; }
+
+.player__track {
+  position: relative;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.player__track::before {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  height: 4px;
+  border-radius: var(--r-pill);
+  background: var(--hairline);
+}
+
+.player__fill {
+  position: absolute;
+  inset-inline: 0;
+  height: 4px;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  transform-origin: left center;
+  will-change: transform;
+}
+
+.player__knob {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  transition: transform var(--t-fast) var(--ease-out);
+}
+.player__track:hover .player__knob,
+.player__track.is-scrubbing .player__knob { transform: scale(1.35); }
+
+.player__times {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.02em;
+  color: var(--ink-3);
+}
+
+.player__toggle { flex: none; font-size: 0.8125rem; }
+
+.cues {
+  list-style: none;
+  margin: var(--s-3) 0 0;
+  padding: var(--s-2) 0 0;
+  border-top: 1px solid var(--hairline);
+  max-height: 13rem;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.cues__line {
+  display: flex;
+  gap: var(--s-3);
+  width: 100%;
+  padding: 0.3rem 0.4rem;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  color: var(--ink-3);
+  font-size: 0.875rem;
+  line-height: 1.55;
+  transition: color var(--t-fast) linear, background var(--t-fast) linear;
+}
+
+.cues__line:hover { background: var(--accent-tint); }
+
+.cues__line.is-active {
+  color: var(--ink);
+  background: var(--accent-tint);
+  font-weight: 550;
+}
+
+.cues__time {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  padding-top: 0.2rem;
+  color: var(--ink-3);
+}
+
+/* --- editor sheet ------------------------------------------------------- */
+
+.sheet-layer { position: fixed; inset: 0; z-index: 50; }
+
+.scrim {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  background: var(--scrim);
+  backdrop-filter: blur(2px);
+  animation: fade var(--t-base) var(--ease-out) both;
+  cursor: default;
+}
+
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+
+.sheet {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: min(42rem, 100%);
+  max-height: min(92dvh, 54rem);
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  animation: sheet-up var(--t-slow) var(--spring) both;
+}
+
+/* Two names, not one. A second @keyframes block with the same name wins
+   everywhere, media query or not, and would strip the desktop centring. */
+@keyframes sheet-up {
+  from { opacity: 0; transform: translate(-50%, 24px); }
+  to   { opacity: 1; transform: translateX(-50%); }
+}
+
+@keyframes sheet-center {
+  from { opacity: 0; transform: translate(-50%, -46%) scale(0.97); }
+  to   { opacity: 1; transform: translate(-50%, -50%); }
+}
+
+@media (min-width: 48rem) {
+  .sheet {
+    top: 50%;
+    bottom: auto;
+    transform: translate(-50%, -50%);
+    border-radius: var(--r-xl);
+    animation-name: sheet-center;
+  }
+}
+
+.sheet__head,
+.sheet__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  padding: var(--s-4) var(--s-5);
+}
+
+.sheet__head { border-bottom: 1px solid var(--hairline); }
+.sheet__head h2 { margin: 0; font-size: 1.0625rem; letter-spacing: -0.01em; }
+
+.sheet__foot {
+  border-top: 1px solid var(--hairline);
+  padding-bottom: max(var(--s-4), env(safe-area-inset-bottom));
+}
+.sheet__foot .hint { margin: 0; flex: 1; }
+
+.sheet__scroll { overflow-y: auto; padding: var(--s-4) var(--s-5); }
+.sheet__scroll .label { margin-top: var(--s-4); }
+.sheet__scroll > .label:first-child { margin-top: 0; }
+
+.sheet__labelrow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: var(--s-4);
+}
+.sheet__labelrow .label { margin: 0; }
+
+.hint--over { color: var(--bad); font-weight: 600; }
+
+.sheet__grid { display: grid; gap: var(--s-4); grid-template-columns: 1fr 1fr; }
+@media (max-width: 30rem) { .sheet__grid { grid-template-columns: 1fr; } }
+
+.slider {
+  width: 100%;
+  accent-color: var(--accent);
+  margin-top: var(--s-2);
+}
+
+/* --- tag input ---------------------------------------------------------- */
+
+.taginput__box {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s-2);
+  padding: 0.45rem 0.55rem;
+}
+
+.taginput__input {
+  flex: 1;
+  min-width: 8rem;
+  border: 0;
+  background: none;
+  padding: 0.2rem;
+}
+.taginput__input:focus { outline: none; }
+
+.chip--static { cursor: default; }
+
+.chip__x {
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 0 0 0 var(--s-1);
+  font-size: 1rem;
+  line-height: 1;
+  opacity: 0.6;
+}
+.chip__x:hover { opacity: 1; }
+
+.taginput__suggest { display: flex; flex-wrap: wrap; gap: var(--s-2); margin-top: var(--s-2); }
+
+@media (max-width: 40rem) {
+  .shell { padding-inline: var(--s-2); }
+  .topbar { border-radius: var(--r-lg); }
+  .topbar__search { order: 3; flex-basis: 100%; }
+}
+
+/* --- voice preview ------------------------------------------------------ */
+
+.preview {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  margin-top: var(--s-4);
+  padding: var(--s-3);
+  border-radius: var(--r-md);
+  background: var(--glass-thin);
+  border: 1px solid var(--hairline);
+}
+
+.preview__btn { flex: none; }
+.preview__hint { min-width: 0; }
+
+/* --- format switch and the "what gets read" panel ----------------------- */
+
+.segmented {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  margin-bottom: var(--s-3);
+  border-radius: var(--r-pill);
+  background: var(--glass-thin);
+  border: 1px solid var(--hairline);
+}
+
+.segmented__option {
+  border: 0;
+  background: none;
+  color: var(--ink-2);
+  padding: 0.3rem 0.85rem;
+  border-radius: var(--r-pill);
+  font-size: 0.875rem;
+  font-weight: 550;
+  cursor: pointer;
+  transition: background var(--t-fast) var(--ease-out),
+    color var(--t-fast) var(--ease-out), transform var(--t-fast) var(--ease-out);
+}
+
+.segmented__option:active { transform: scale(0.96); }
+
+.segmented__option[aria-checked="true"] {
+  background: var(--accent);
+  color: var(--accent-ink);
+  box-shadow: 0 1px 4px rgba(10, 90, 200, 0.28);
+}
+
+.sheet__note { margin: var(--s-2) 0 0; }
+
+.spoken { margin-top: var(--s-2); }
+.spoken__toggle { padding-inline: 0; font-size: 0.8125rem; }
+
+.spoken__body {
+  margin-top: var(--s-2);
+  padding: var(--s-3);
+  border-radius: var(--r-md);
+  background: var(--glass-thin);
+  border: 1px solid var(--hairline);
+  max-height: 14rem;
+  overflow: auto;
+}
+
+.spoken__text {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--ink-2);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* --- progress and long bodies ------------------------------------------- */
+
+.bar {
+  height: 4px;
+  border-radius: var(--r-pill);
+  background: var(--hairline);
+  overflow: hidden;
+}
+
+.bar__fill {
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  transform-origin: left center;
+  transition: transform var(--t-slow) var(--ease-out);
+}
+
+.cues__loading { padding: var(--s-3) 0 0; }
+
+/* --- readings ----------------------------------------------------------- */
+
+.readings {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.reading {
+  padding: var(--s-3);
+  border-radius: var(--r-md);
+  background: var(--glass-thin);
+  border: 1px solid var(--hairline);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-2);
+}
+
+.reading .player {
+  background: none;
+  border: 0;
+  padding: 0;
+}
+
+.reading__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-3);
+}
+
+.reading__what { font-size: 0.875rem; font-weight: 600; letter-spacing: 0.005em; }
+.reading__len { font-weight: 400; color: var(--ink-3); }
+
+.reading__running { display: flex; flex-direction: column; gap: var(--s-2); }
+
+.reading__running-foot,
+.reading__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+  /* Pinned to the bottom, so a short card still lines up with its files. */
+  margin-top: auto;
+}
+
+.reading__links { display: flex; align-items: center; gap: var(--s-1); }
+
+.reading__links a {
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--r-sm);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--ink-2);
+  text-decoration: none;
+}
+.reading__links a:hover { background: var(--accent-tint); color: var(--ink); }
+
+.status--stopped { color: var(--warn); background: rgba(178, 106, 0, 0.14); }
+
+.lockchip {
+  flex: none;
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--r-pill);
+  background: rgba(178, 106, 0, 0.16);
+  color: var(--warn);
+}
+
+.card.is-locked { box-shadow: var(--shadow-md), 0 0 0 1px rgba(178, 106, 0, 0.35); }
+
+/* --- the plan before a long reading ------------------------------------- */
+
+.plan { padding: var(--s-4); border-radius: var(--r-md); }
+
+.plan__head {
+  margin: 0 0 var(--s-3);
+  font-size: 0.9375rem;
+  letter-spacing: -0.005em;
+}
+
+.plan__facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--s-3);
+  margin: 0 0 var(--s-3);
+}
+
+.plan__facts div { min-width: 0; }
+
+.plan__facts dt {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+}
+
+.plan__facts dd {
+  margin: 2px 0 0;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.plan__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--s-2);
+  margin-top: var(--s-4);
+}
+
+.btn--small { padding: 0.35rem 0.75rem; font-size: 0.875rem; }
+
+/* Quiet until it's pointed at, loud once it's armed. Deleting is two presses
+   everywhere in the app, and the second one should look like what it is. */
+.btn--danger { color: var(--ink-2); }
+.btn--danger:hover:not(:disabled) { color: var(--bad); background: var(--bad-tint); }
+
+.btn--danger.is-armed {
+  color: var(--bad);
+  background: var(--bad-tint);
+  font-weight: 600;
+}
+
+.btn--danger:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* --- the entry's own page ----------------------------------------------- */
+
+.page {
+  max-width: 60rem;
+  margin-inline: auto;
+  padding: var(--s-4) var(--s-4) var(--s-7);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  animation: rise var(--t-base) var(--ease-out) both;
+}
+
+.page__back { align-self: flex-start; }
+
+.page__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s-5);
+  padding: var(--s-5);
+  flex-wrap: wrap;
+}
+
+.page__titles { min-width: 0; display: flex; flex-direction: column; gap: var(--s-2); }
+
+.page__titles h1 {
+  margin: 0;
+  font-size: clamp(1.375rem, 3vw, 1.875rem);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  font-weight: 660;
+}
+
+.page__actions { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
+
+.page__section { display: flex; flex-direction: column; gap: var(--s-3); }
+
+.page__h2 {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-3);
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.page__h2 .hint { text-transform: none; letter-spacing: 0; }
+
+.page__text {
+  padding: var(--s-4);
+  border-radius: var(--r-md);
+  white-space: pre-wrap;
+  line-height: 1.7;
+  color: var(--ink-2);
+  max-height: 34rem;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+@media (max-width: 40rem) {
+  .page { padding-inline: var(--s-2); }
+  .page__head { padding: var(--s-4); }
+}
+
+/* --- one recording, one card -------------------------------------------- */
+
+.readings { display: flex; flex-direction: column; gap: var(--s-4); }
+
+/* The recording, and the files it produced, side by side and the same height. */
+.pair {
+  display: grid;
+  gap: var(--s-3);
+  grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+  align-items: stretch;
+}
+
+.pair--alone { grid-template-columns: 1fr; }
+
+@media (max-width: 62rem) {
+  .pair { grid-template-columns: 1fr; }
+}
+
+.reading {
+  padding: var(--s-4);
+  border-radius: var(--r-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-3);
+}
+
+.reading.is-failed { border-color: rgba(208, 52, 44, 0.4); }
+.reading.is-processing { border-color: var(--accent); }
+
+.reading .player { background: none; border: 0; padding: 0; }
+
+.reading__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--s-3);
+}
+
+.reading__title {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 640;
+  letter-spacing: -0.005em;
+}
+
+.reading__sub {
+  margin: 2px 0 0;
+  font-size: 0.8125rem;
+  color: var(--ink-3);
+}
+
+.tick {
+  flex: none;
+  width: 1.375rem;
+  height: 1.375rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(31, 157, 85, 0.16);
+  color: var(--good);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.reading__running { display: flex; flex-direction: column; gap: var(--s-2); }
+
+.reading__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+  /* Pinned to the bottom, so a short card still lines up with its files. */
+  margin-top: auto;
+}
+
+/* --- the files, in the open -------------------------------------------- */
+
+.files {
+  padding: var(--s-3);
+  border-radius: var(--r-md);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.files__list {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  gap: 2px;
+  flex: 1;
+}
+
+.files__head {
+  margin: 0 0 var(--s-1);
+  padding-inline: var(--s-2);
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.files a {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-2);
+  border-radius: var(--r-sm);
+  color: inherit;
+  text-decoration: none;
+  transition: background var(--t-fast) var(--ease-out),
+    transform var(--t-fast) var(--ease-out);
+}
+
+.files a:hover { background: var(--accent-tint); }
+.files a:active { transform: scale(0.985); }
+
+.files__icon {
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-sm);
+  background: var(--accent-tint);
+  color: var(--accent);
+}
+
+.files__body { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.files__body strong { font-size: 0.9375rem; font-weight: 600; }
+
+.files__body span {
+  font-size: 0.8125rem;
+  color: var(--ink-3);
+  line-height: 1.35;
+}
+
+.files__ext {
+  flex: none;
+  align-self: flex-start;
+  margin-top: 0.15rem;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+  padding: 0.1rem 0.4rem;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--hairline);
+}
+
+.reading__foot--end { justify-content: flex-end; }
+
+/* --- the two views of the text ------------------------------------------ */
+
+.switchrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+}
+.switchrow .segmented { margin-bottom: 0; }
+
+.panel {
+  padding: var(--s-4);
+  border-radius: var(--r-md);
+  white-space: pre-wrap;
+  line-height: 1.7;
+  color: var(--ink-2);
+  max-height: 32rem;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.empty-line {
+  margin: 0;
+  padding: var(--s-4);
+  border-radius: var(--r-md);
+  color: var(--ink-3);
+  font-size: 0.9375rem;
+}
+
+.page__gist { margin: 0; color: var(--ink-2); font-size: 0.9375rem; }
+.page__chips { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+
+.chip--tag { background: var(--accent-tint); border-color: transparent; color: var(--ink-2); }
+
+.reading__marks { display: flex; align-items: center; gap: var(--s-2); flex: none; }
+
+.pill {
+  font-size: 0.6875rem;
+  font-weight: 620;
+  letter-spacing: 0.02em;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--r-pill);
+  background: var(--accent-tint);
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+/* --- making a recording -------------------------------------------------- */
+
+.gen {
+  padding: var(--s-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+  animation: rise var(--t-base) var(--ease-out) both;
+}
+
+.gen__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-3);
+}
+.gen__head h3 { margin: 0; font-size: 1.0625rem; letter-spacing: -0.01em; }
+
+.gen__modes {
+  display: grid;
+  gap: var(--s-2);
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+}
+
+.mode {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  padding: var(--s-3);
+  border-radius: var(--r-md);
+  border: 1px solid var(--hairline);
+  background: var(--glass-thin);
+  cursor: pointer;
+  transition: border-color var(--t-fast) var(--ease-out),
+    background var(--t-fast) var(--ease-out), transform var(--t-fast) var(--ease-out);
+}
+
+.mode:active { transform: scale(0.985); }
+.mode strong { font-size: 0.9375rem; font-weight: 620; }
+.mode span { font-size: 0.8125rem; color: var(--ink-3); }
+
+.mode.is-on {
+  border-color: var(--accent);
+  background: var(--accent-tint);
+}
+.mode.is-on span { color: var(--ink-2); }
+
+.gen__block { display: flex; flex-direction: column; gap: var(--s-2); }
+.gen__block .segmented { margin-bottom: 0; align-self: flex-start; }
+
+.gen__voice {
+  display: grid;
+  gap: var(--s-4);
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+}
+.gen__voice .label { margin-bottom: var(--s-2); }
+.gen__voice .sheet__labelrow { margin-top: 0; }
+
+.gen__foot {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--s-4);
+  flex-wrap: wrap;
+  padding-top: var(--s-4);
+  border-top: 1px solid var(--hairline);
+}
+
+.gen__facts { display: flex; gap: var(--s-6); margin: 0; }
+
+.gen__facts dt {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+}
+
+.gen__facts dd {
+  margin: 2px 0 0;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* --- the range picker ---------------------------------------------------- */
+
+.range { display: flex; flex-direction: column; gap: var(--s-2); }
+
+.range__track {
+  position: relative;
+  height: 28px;
+  display: flex;
+  align-items: center;
+}
+
+.range__track::before {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: var(--hairline);
+}
+
+.range__span {
+  position: absolute;
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+}
+
+/* Two sliders stacked on one track. Only the thumbs take the pointer. */
+.range__input {
+  position: absolute;
+  inset-inline: 0;
+  width: 100%;
+  margin: 0;
+  background: none;
+  appearance: none;
+  pointer-events: none;
+  height: 28px;
+}
+
+.range__input::-webkit-slider-thumb {
+  appearance: none;
+  pointer-events: auto;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--glass-thick);
+  border: 2px solid var(--accent);
+  box-shadow: var(--shadow-sm);
+  cursor: grab;
+}
+.range__input::-webkit-slider-thumb:active { cursor: grabbing; transform: scale(1.1); }
+
+.range__input::-moz-range-thumb {
+  pointer-events: auto;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--glass-thick);
+  border: 2px solid var(--accent);
+  cursor: grab;
+}
+.range__input::-moz-range-track { background: none; }
+
+.range__scale {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  color: var(--ink-3);
+}
+
+.range__ends {
+  display: grid;
+  gap: var(--s-3);
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+}
+
+.range__end {
+  padding: var(--s-3);
+  border-radius: var(--r-md);
+  background: var(--glass-thin);
+  border: 1px solid var(--hairline);
+}
+
+.range__label {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+}
+
+.range__quote {
+  margin: var(--s-1) 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--ink);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.range__jump { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
+.range__count { margin-left: auto; }
+
+/* --- what a recording covers -------------------------------------------- */
+
+.cover { display: flex; flex-direction: column; gap: var(--s-1); }
+
+.cover__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-3);
+}
+
+.cover__label {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+}
+
+.cover__share {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--ink-2);
+}
+
+.cover__track {
+  position: relative;
+  height: 8px;
+  border-radius: var(--r-pill);
+  background: var(--hairline);
+  overflow: hidden;
+}
+
+.cover__fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: var(--r-pill);
+  background: linear-gradient(90deg, var(--accent), var(--accent-strong));
+}
+
+.opening {
+  margin: 0;
+  padding-left: var(--s-3);
+  border-left: 2px solid var(--edge);
+  color: var(--ink-3);
+  font-size: 0.875rem;
+  line-height: 1.55;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* --- dropping a file in ---------------------------------------------------- */
+
+.drop {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  padding: var(--s-3);
+  /* The sheet spaces itself off its labels, and this sits between a label row
+     and the format switch, neither of which brings any margin of its own. */
+  margin-block: var(--s-2) var(--s-3);
+  border: 1px dashed var(--hairline);
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--ink) 3%, transparent);
+  transition: border-color var(--t-fast) var(--ease-out),
+    background var(--t-fast) var(--ease-out);
+}
+
+/* Dragging a file gives no hover, so the whole zone has to answer the pointer. */
+.drop--over {
+  border-color: var(--accent);
+  border-style: solid;
+  background: var(--accent-tint);
+}
+
+.drop--done { border-style: solid; }
+
+.drop__icon {
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-sm);
+  background: var(--accent-tint);
+  color: var(--accent);
+}
+
+.drop__body { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.drop__body strong { font-size: 0.9375rem; font-weight: 600; }
+
+.drop__body span {
+  font-size: 0.8125rem;
+  color: var(--ink-3);
+  line-height: 1.35;
+  /* Squeezed between an icon and a button, this list wraps. Let the browser
+     even the lines out rather than leaving two words on the second one. */
+  text-wrap: pretty;
+}
+
+.drop__input { display: none; }
+
+.drop--busy { justify-content: center; color: var(--ink-3); font-size: 0.875rem; }
+
+.drop__spinner {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  border: 2px solid var(--hairline);
+  border-top-color: var(--accent);
+  animation: spin 700ms linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drop__spinner { animation-duration: 2s; }
+}
+
+/* A word in a sentence that happens to do something. Identical to the text
+   around it at rest, on purpose: it's a shortcut for people who notice it,
+   not the way anyone is meant to find the editor. The underline on hover and
+   the focus ring are what make it discoverable and reachable by keyboard. */
+.inlink {
+  border: 0;
+  background: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.inlink:hover { text-decoration: underline; text-underline-offset: 2px; }
+
+.inlink:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* An undo offered inside a sentence, so it reads as part of it. */
+.linkish {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--accent);
+  font-weight: 550;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.linkish:hover { color: var(--accent-strong); }
+
+/* --- the file behind an entry, named where you're reading it ------------- */
+
+.switchrow__left,
+.switchrow__right {
+  display: flex;
+  align-items: center;
+  gap: var(--s-3);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+/* Identity and download in one control: it says which document this came out
+   of, and pressing it hands you that document. A separate card for the same
+   two facts was a card's worth of furniture for a line's worth of content. */
+.filepill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-2);
+  max-width: 100%;
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-pill);
+  color: var(--ink-2);
+  text-decoration: none;
+  font-size: 0.8125rem;
+  line-height: 1.2;
+  transition: background var(--t-fast) var(--ease-out),
+    color var(--t-fast) var(--ease-out),
+    border-color var(--t-fast) var(--ease-out);
+}
+
+.filepill:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-tint);
+}
+
+.filepill:active { transform: scale(0.985); }
+
+.filepill__mark { display: grid; place-items: center; flex: none; color: var(--ink-3); }
+.filepill:hover .filepill__mark { color: inherit; }
+
+.filepill__name {
+  font-weight: 550;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.filepill:hover .filepill__name { color: inherit; }
+
+/* The type and size sit behind the name: useful, but never the headline. */
+.filepill__type {
+  flex: none;
+  color: var(--ink-3);
+  font-size: 0.75rem;
+  letter-spacing: 0.01em;
+}
+
+.filepill:hover .filepill__type { color: inherit; }
+
+/* Faint but always there. Hidden until hover, the pill reads as a label and
+   nobody discovers that pressing it hands them the file. */
+.filepill__down { flex: none; opacity: 0.45; transition: opacity var(--t-fast) var(--ease-out); }
+.filepill:hover .filepill__down,
+.filepill:focus-visible .filepill__down { opacity: 1; }
+
+.filepill--plain { border-color: transparent; padding-inline: var(--s-2); }
+.filepill--plain .filepill__name { font-weight: 500; color: var(--ink-3); font-size: 0.75rem; }
+.filepill--plain .filepill__down { opacity: 0.55; }
+.filepill--plain:hover .filepill__name { color: inherit; }
+
+@media (max-width: 40rem) {
+  /* Two long filenames and a character count won't share a phone's width. */
+  .switchrow__left,
+  .switchrow__right { width: 100%; justify-content: space-between; }
+}

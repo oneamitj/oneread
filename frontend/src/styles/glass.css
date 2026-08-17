@@ -1,0 +1,187 @@
+/* Base layout, glass materials, and the handful of controls the app reuses. */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 100%;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--bg-base);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* The colour behind everything. Fixed, so glass has something to refract. */
+.backdrop {
+  position: fixed;
+  inset: -20vmax;
+  z-index: -1;
+  background:
+    radial-gradient(38vmax 38vmax at 18% 12%, var(--bg-blob-1), transparent 62%),
+    radial-gradient(42vmax 42vmax at 84% 22%, var(--bg-blob-2), transparent 60%),
+    radial-gradient(46vmax 46vmax at 46% 92%, var(--bg-blob-3), transparent 64%);
+  filter: blur(30px);
+  animation: drift 48s var(--ease-in-out) infinite alternate;
+}
+
+@keyframes drift {
+  from { transform: translate3d(-1.5%, -1%, 0) scale(1.02); }
+  to   { transform: translate3d(2%, 1.5%, 0) scale(1.08); }
+}
+
+button, input, textarea, select { font: inherit; color: inherit; }
+
+:where(button, a, input, textarea, select, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+/* --- materials ---------------------------------------------------------- */
+
+.glass {
+  background: var(--glass-regular);
+  backdrop-filter: var(--glass-blur-regular);
+  -webkit-backdrop-filter: var(--glass-blur-regular);
+  border: 1px solid var(--edge);
+  border-top-color: var(--edge-top);
+  box-shadow: var(--shadow-md);
+  border-radius: var(--r-lg);
+}
+
+.glass--thin {
+  background: var(--glass-thin);
+  backdrop-filter: var(--glass-blur-thin);
+  -webkit-backdrop-filter: var(--glass-blur-thin);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Bigger surfaces read as thicker: more blur, deeper shadow. */
+.glass--thick {
+  background: var(--glass-thick);
+  backdrop-filter: var(--glass-blur-thick);
+  -webkit-backdrop-filter: var(--glass-blur-thick);
+  box-shadow: var(--shadow-lg);
+  border-radius: var(--r-xl);
+}
+
+/* --- controls ----------------------------------------------------------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s-2);
+  padding: 0.5rem 0.95rem;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--edge);
+  background: var(--glass-thin);
+  backdrop-filter: var(--glass-blur-thin);
+  -webkit-backdrop-filter: var(--glass-blur-thin);
+  color: var(--ink);
+  font-weight: 550;
+  letter-spacing: 0.005em;
+  cursor: pointer;
+  transition: transform var(--t-fast) var(--ease-out),
+    background var(--t-fast) var(--ease-out), opacity var(--t-fast) linear;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.btn:hover { background: var(--glass-regular); }
+.btn:active { transform: scale(0.965); }
+.btn[disabled] { opacity: 0.45; cursor: default; transform: none; }
+
+.btn--primary {
+  background: var(--accent);
+  border-color: transparent;
+  color: var(--accent-ink);
+  box-shadow: 0 1px 2px rgba(10, 60, 140, 0.24), 0 8px 20px rgba(10, 90, 200, 0.28);
+}
+.btn--primary:hover { background: var(--accent-strong); }
+
+.btn--quiet {
+  background: transparent;
+  border-color: transparent;
+  color: var(--ink-2);
+  padding: 0.4rem 0.6rem;
+}
+.btn--quiet:hover { background: var(--accent-tint); color: var(--ink); }
+
+.btn--danger:hover { background: rgba(208, 52, 44, 0.14); color: var(--bad); }
+
+.btn--icon { padding: 0.45rem; border-radius: var(--r-pill); }
+
+.field {
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--r-md);
+  border: 1px solid var(--hairline);
+  background: var(--glass-thin);
+  transition: border-color var(--t-fast) var(--ease-out),
+    box-shadow var(--t-fast) var(--ease-out);
+}
+
+.field:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-tint);
+}
+
+.field--area { resize: vertical; min-height: 9rem; line-height: 1.6; }
+
+.label {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--ink-2);
+  margin-bottom: var(--s-2);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s-1);
+  padding: 0.2rem 0.6rem;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--edge);
+  background: var(--glass-thin);
+  font-size: 0.8125rem;
+  letter-spacing: 0.01em;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: background var(--t-fast) var(--ease-out),
+    color var(--t-fast) var(--ease-out), transform var(--t-fast) var(--ease-out);
+}
+.chip:active { transform: scale(0.95); }
+.chip[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: transparent;
+  color: var(--accent-ink);
+}
+
+.hint { font-size: 0.8125rem; color: var(--ink-3); }
+.error-text { font-size: 0.875rem; color: var(--bad); }
+
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backdrop { animation: none; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 120ms !important;
+  }
+}

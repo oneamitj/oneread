@@ -1,0 +1,133 @@
+/* Design tokens. Light is the base; dark redefines only what changes. */
+
+:root {
+  color-scheme: light dark;
+
+  /* Type: system stack, so optical sizing and tracking tables come for free. */
+  --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
+    system-ui, "Helvetica Neue", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+
+  /* Spacing on a 4pt grid, in rem so it scales with the reader's text size. */
+  --s-1: 0.25rem;
+  --s-2: 0.5rem;
+  --s-3: 0.75rem;
+  --s-4: 1rem;
+  --s-5: 1.5rem;
+  --s-6: 2rem;
+  --s-7: 3rem;
+
+  --r-sm: 10px;
+  --r-md: 16px;
+  --r-lg: 24px;
+  --r-xl: 32px;
+  --r-pill: 999px;
+
+  /* Ink */
+  --ink: #16161a;
+  --ink-2: rgba(22, 22, 26, 0.66);
+  --ink-3: rgba(22, 22, 26, 0.42);
+  --ink-inverse: #ffffff;
+
+  /* Accent: a warm blue that reads as "press play". */
+  --accent: #0a72f5;
+  --accent-strong: #0559cc;
+  --accent-ink: #ffffff;
+  --accent-tint: rgba(10, 114, 245, 0.12);
+
+  --good: #1f9d55;
+  --warn: #b26a00;
+  --bad: #d0342c;
+  --bad-tint: rgba(208, 52, 44, 0.12);
+
+  /* The page behind the glass. Three blobs of colour, no image files. */
+  --bg-base: #eef1f7;
+  --bg-blob-1: rgba(120, 160, 255, 0.55);
+  --bg-blob-2: rgba(255, 150, 200, 0.42);
+  --bg-blob-3: rgba(120, 235, 220, 0.40);
+
+  /* Materials. Thicker surfaces get more blur and a deeper shadow. */
+  --glass-thin: rgba(255, 255, 255, 0.52);
+  --glass-regular: rgba(255, 255, 255, 0.62);
+  --glass-thick: rgba(255, 255, 255, 0.74);
+  --glass-blur-thin: blur(18px) saturate(170%);
+  --glass-blur-regular: blur(28px) saturate(180%);
+  --glass-blur-thick: blur(44px) saturate(190%);
+
+  /* The bright top edge is light catching the material. */
+  --edge-top: rgba(255, 255, 255, 0.85);
+  --edge: rgba(255, 255, 255, 0.5);
+  --hairline: rgba(22, 22, 26, 0.08);
+
+  --shadow-sm: 0 1px 2px rgba(16, 20, 40, 0.06), 0 4px 12px rgba(16, 20, 40, 0.06);
+  --shadow-md: 0 2px 6px rgba(16, 20, 40, 0.08), 0 14px 34px rgba(16, 20, 40, 0.10);
+  --shadow-lg: 0 8px 20px rgba(16, 20, 40, 0.12), 0 32px 70px rgba(16, 20, 40, 0.18);
+
+  --scrim: rgba(18, 20, 30, 0.28);
+
+  /* Motion. Critically damped by default; bounce only after a flick. */
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --spring: cubic-bezier(0.22, 1.2, 0.36, 1);
+  --t-fast: 140ms;
+  --t-base: 260ms;
+  --t-slow: 400ms;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #f4f5f8;
+    --ink-2: rgba(244, 245, 248, 0.68);
+    --ink-3: rgba(244, 245, 248, 0.44);
+    --ink-inverse: #101116;
+
+    --accent: #4c9dff;
+    --accent-strong: #74b4ff;
+    --accent-ink: #06121f;
+    --accent-tint: rgba(76, 157, 255, 0.18);
+
+    --good: #46c07f;
+    --warn: #e0a340;
+    --bad: #ff6b60;
+    --bad-tint: rgba(255, 107, 96, 0.18);
+
+    --bg-base: #0b0c10;
+    --bg-blob-1: rgba(40, 90, 220, 0.55);
+    --bg-blob-2: rgba(190, 60, 140, 0.42);
+    --bg-blob-3: rgba(20, 150, 150, 0.40);
+
+    --glass-thin: rgba(30, 32, 40, 0.52);
+    --glass-regular: rgba(30, 32, 40, 0.62);
+    --glass-thick: rgba(26, 28, 36, 0.76);
+
+    --edge-top: rgba(255, 255, 255, 0.16);
+    --edge: rgba(255, 255, 255, 0.08);
+    --hairline: rgba(255, 255, 255, 0.10);
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.32);
+    --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.45), 0 16px 40px rgba(0, 0, 0, 0.42);
+    --shadow-lg: 0 10px 24px rgba(0, 0, 0, 0.5), 0 36px 80px rgba(0, 0, 0, 0.55);
+
+    --scrim: rgba(0, 0, 0, 0.5);
+  }
+}
+
+/* Frostier and flatter when the reader asked for less transparency. */
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --glass-thin: Canvas;
+    --glass-regular: Canvas;
+    --glass-thick: Canvas;
+    --glass-blur-thin: none;
+    --glass-blur-regular: none;
+    --glass-blur-thick: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --hairline: currentColor;
+    --ink-2: var(--ink);
+    --ink-3: var(--ink);
+  }
+}

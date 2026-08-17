@@ -1,0 +1,14 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "bounce-easing",
+        "value": "var(--spring)",
+        "createdAt": "2026-08-17T07:00:20.954Z",
+        "reason": "design system: --spring is cubic-bezier(0.22, 1.2, 0.36, 1), a single 1.2 overshoot with no oscillation, used only on the two entrance animations (auth card, sheet present) of an app modelled on Apple sheet presentation"
+      }
+    ]
+  }
+}

@@ -1,0 +1,17 @@
+.venv/
+data/
+node_modules/
+dist/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.env
+*.wav
+!backend/tests/**/*.wav
+.DS_Store
+
+# Per-machine tooling state, not part of the project.
+.claude/settings.local.json
+.impeccable/config.local.json
+.impeccable/hook.cache.json

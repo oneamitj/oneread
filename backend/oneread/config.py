@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import secrets
 from functools import lru_cache
 from pathlib import Path
@@ -25,6 +26,9 @@ class Settings(BaseSettings):
 
     # --- http ---------------------------------------------------------------
     allowed_hosts: list[str] = ["*"]
+    #: Origins allowed to call the API from a browser. Normally empty: the
+    #: frontend is served from this same origin, so nothing cross-site is
+    #: needed. "*" is refused outright — see `_no_wildcard_origin`.
     cors_origins: list[str] = []
     #: Ceiling on a request body, for everything except uploads (which carry
     #: their own, larger limit). A 100k-character entry is comfortably inside
@@ -84,6 +88,12 @@ class Settings(BaseSettings):
     generate_per_hour: int = 30
     preview_per_hour: int = 120
     upload_per_hour: int = 60
+    #: The routes that reflow text without synthesizing it: what the voice will
+    #: say, the sentence list behind the range picker, and the cost estimate.
+    #: None of them make audio, so none was metered — but each one parses and
+    #: segments up to `max_text_chars`, and there is a single worker to occupy.
+    #: Generous enough that a range picker dragging in real time never notices.
+    text_per_minute: int = 120
 
     # --- frontend -----------------------------------------------------------
     static_dir: Path = Path("./frontend/dist")
@@ -100,6 +110,31 @@ class Settings(BaseSettings):
     def _split_csv(cls, value: object) -> object:
         if isinstance(value, str):
             return [item.strip() for item in value.split(",") if item.strip()]
+        return value
+
+    @field_validator("cors_origins")
+    @classmethod
+    def _no_wildcard_origin(cls, value: list[str]) -> list[str]:
+        """Refuse "*", because the app sends cookies cross-origin.
+
+        Starlette treats `allow_origins=["*"]` together with
+        `allow_credentials=True` as "reflect whichever Origin asked", so the
+        answer carries `Access-Control-Allow-Credentials: true` for any site on
+        the internet. That hands every page a signed-in reader visits their whole
+        library, and it also lifts the one thing standing in front of writes: the
+        `X-Requested-With` check works because a cross-site request can't set
+        that header without a preflight that fails. An allowed origin's preflight
+        doesn't fail.
+
+        So the wildcard is a mistake rather than a setting, and it stops the app
+        from starting instead of quietly turning the same-origin policy off.
+        """
+        if "*" in value:
+            raise ValueError(
+                "ONEREAD_CORS_ORIGINS can't be '*': sessions are cookie-based, and a "
+                "wildcard would let any site read and change a signed-in reader's "
+                "library. Name the origins instead, e.g. https://oneread.example."
+            )
         return value
 
     @property
@@ -159,9 +194,22 @@ def _stored_secret(data_dir: Path) -> str:
     except FileNotFoundError:
         pass
 
+    # Created at 0600 rather than created and then narrowed: `write_text` opens
+    # the file under the process umask, which is usually 0644, so a chmod
+    # afterwards leaves a window where any local account can read the key — and
+    # the key is enough to sign a cookie naming any user.
+    #
+    # O_EXCL settles the other race too. Two workers starting together can both
+    # find no file and both make a key; whoever creates it wins, and the loser
+    # reads what the winner wrote instead of overwriting it. Without that, half
+    # the workers would be signing with a key the other half rejects.
     key = secrets.token_urlsafe(48)
-    path.write_text(key)
-    path.chmod(0o600)  # readable by the account running the app, nobody else
+    try:
+        handle = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except FileExistsError:
+        return path.read_text().strip() or key
+    with os.fdopen(handle, "w") as sink:
+        sink.write(key)
     return key
 
 

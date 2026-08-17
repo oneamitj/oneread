@@ -3,8 +3,12 @@
 # --- stage 1: the browser bundle -------------------------------------------
 FROM node:22-alpine AS web
 WORKDIR /build
-COPY frontend/package.json frontend/package-lock.json* ./
-RUN npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+COPY frontend/package.json frontend/package-lock.json ./
+# `npm ci` and nothing else. The fallback that used to sit here (`|| npm
+# install`) meant any lockfile drift silently resolved fresh versions instead,
+# so the lockfile stopped being a control exactly when it mattered. A build that
+# can't honour the lockfile should stop.
+RUN npm ci --no-audit --no-fund
 COPY frontend/ ./
 RUN npm run build
 
@@ -33,8 +37,23 @@ RUN apt-get update \
 # ENV ONEREAD_SOFFICE_PATH=/usr/bin/soffice
 
 WORKDIR /app
+
+# Dependencies come from the lockfile, with hashes, and --require-hashes makes
+# pip refuse any package whose bytes don't match. Without it the versions here
+# were whatever PyPI happened to be serving at build time — across twenty
+# packages, several of which parse documents uploaded by strangers.
+#
+# Copied and installed before the source, so editing the app doesn't invalidate
+# this layer. Regenerate after changing pyproject.toml:
+#   cd backend && uv pip compile pyproject.toml --generate-hashes --universal \
+#     --python-version 3.12 -o requirements.txt
+COPY backend/requirements.txt /app/backend/requirements.txt
+RUN pip install --no-cache-dir --require-hashes -r /app/backend/requirements.txt
+
+# --no-deps because the lockfile above is the whole dependency set already, and
+# the local directory has no hash of its own to check.
 COPY backend/ /app/backend/
-RUN pip install --no-cache-dir /app/backend
+RUN pip install --no-cache-dir --no-deps /app/backend
 
 # Pull the ~385 MB model at build time so a running container never reaches
 # out to the network. This is the whole point of "no external dependency".

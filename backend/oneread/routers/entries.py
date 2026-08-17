@@ -41,6 +41,7 @@ from .uploads import claim, forget
 router = APIRouter(prefix="/api/entries", tags=["entries"])
 
 _generate_limiter: RateLimiter | None = None
+_text_limiter: RateLimiter | None = None
 
 # What makes a reading stale. Title and tags are just labels.
 REGENERATING_FIELDS = ("body", "format", "voice", "lang", "speed")
@@ -59,9 +60,28 @@ def generate_limiter(settings: Annotated[Settings, Depends(get_settings)]) -> Ra
     return _generate_limiter
 
 
+def text_limiter(settings: Annotated[Settings, Depends(get_settings)]) -> RateLimiter:
+    """For the routes that measure a document rather than read it.
+
+    `segments` and `estimate` make no audio, so neither is held to the hourly
+    generation limit — but both segment up to `max_text_chars` on every call,
+    against one process. Loose enough that dragging the range picker is fine.
+    """
+    global _text_limiter
+    if _text_limiter is None:
+        _text_limiter = RateLimiter(
+            rate=settings.text_per_minute, per_seconds=60.0, burst=settings.text_per_minute
+        )
+    return _text_limiter
+
+
+TOO_MUCH_TEXT_WORK = "That's a lot of requests at once. Give it a moment."
+
+
 def reset_limiters() -> None:
-    if _generate_limiter is not None:
-        _generate_limiter.reset()
+    for limiter in (_generate_limiter, _text_limiter):
+        if limiter is not None:
+            limiter.reset()
 
 
 # --- lookups ----------------------------------------------------------------
@@ -566,6 +586,7 @@ def entry_segments(
     entry_id: str,
     user: CurrentUser,
     session: Annotated[Session, Depends(get_session)],
+    limiter: Annotated[RateLimiter, Depends(text_limiter)],
     speed: float | None = None,
 ) -> SegmentList:
     """The sentences the reader will produce, with a guess at when each lands.
@@ -573,6 +594,7 @@ def entry_segments(
     This is what the range picker is drawn from: a slider over sentences means a
     range can never start or end mid-sentence.
     """
+    enforce(limiter, user.id, TOO_MUCH_TEXT_WORK)
     entry = _owned(session, entry_id, user.id)
     rates = calibration_for(session, user.id, entry_id)
     pieces = segment_text(_spoken_of(entry), lang=entry.lang)
@@ -602,6 +624,7 @@ def estimate_entry(
     user: CurrentUser,
     session: Annotated[Session, Depends(get_session)],
     settings: Annotated[Settings, Depends(get_settings)],
+    limiter: Annotated[RateLimiter, Depends(text_limiter)],
     scope: str = "full",
     minutes: int | None = None,
     start: int = 0,
@@ -609,6 +632,7 @@ def estimate_entry(
     speed: float | None = None,
 ) -> EstimateOut:
     """How long the audio will be, and how long the machine will take."""
+    enforce(limiter, user.id, TOO_MUCH_TEXT_WORK)
     entry = _owned(session, entry_id, user.id)
     spoken = _spoken_of(entry)
     if scope == "range":

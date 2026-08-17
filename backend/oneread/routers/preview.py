@@ -27,6 +27,7 @@ router = APIRouter(prefix="/api/preview", tags=["preview"])
 CACHE_LIMIT = 300
 
 _preview_limiter: RateLimiter | None = None
+_text_limiter: RateLimiter | None = None
 
 
 def preview_limiter(settings: Annotated[Settings, Depends(get_settings)]) -> RateLimiter:
@@ -40,9 +41,20 @@ def preview_limiter(settings: Annotated[Settings, Depends(get_settings)]) -> Rat
     return _preview_limiter
 
 
+def text_limiter(settings: Annotated[Settings, Depends(get_settings)]) -> RateLimiter:
+    """For the route that flattens text without making any audio."""
+    global _text_limiter
+    if _text_limiter is None:
+        _text_limiter = RateLimiter(
+            rate=settings.text_per_minute, per_seconds=60.0, burst=settings.text_per_minute
+        )
+    return _text_limiter
+
+
 def reset_limiters() -> None:
-    if _preview_limiter is not None:
-        _preview_limiter.reset()
+    for limiter in (_preview_limiter, _text_limiter):
+        if limiter is not None:
+            limiter.reset()
 
 
 class PreviewIn(BaseModel):
@@ -176,9 +188,16 @@ def spoken_text(
     payload: SpeechIn,
     user: CurrentUser,
     settings: Annotated[Settings, Depends(get_settings)],
+    limiter: Annotated[RateLimiter, Depends(text_limiter)],
 ) -> SpokenText:
-    """What the reader will actually say. No synthesis, so it's free to call."""
-    del user  # the session check is the point; the flattening is stateless
+    """What the reader will actually say. No synthesis, so it's cheap to call.
+
+    Cheap, not free: flattening markdown and normalising it is a parse over up
+    to `max_text_chars`, and there is one process serving everybody. So it is
+    metered like the rest, just far more loosely — the editor calls this while
+    somebody types.
+    """
+    enforce(limiter, user.id, "That's a lot of requests at once. Give it a moment.")
     check_length(payload.text, settings)
     spoken = to_speech(payload.text, payload.format)
     return SpokenText(text=spoken, characters=len(spoken))

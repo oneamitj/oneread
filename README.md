@@ -109,7 +109,8 @@ entries are theirs alone.
 
 Signing in sticks. The session cookie lasts a month and renews itself whenever
 you use the app, so someone who reads regularly is never asked again. The key
-that signs those cookies is generated once into `data/secret.key` and reused, so
+that signs those cookies is generated once into `data/secret.key` — created 0600,
+readable by the account running the app and nobody else — and reused, so
 restarting the server doesn't quietly log everybody out. Set `ONEREAD_SECRET_KEY`
 if you'd rather keep it out of the data directory or share one across machines.
 
@@ -162,13 +163,23 @@ hands the whole thing to FastAPI on one port, which is how it runs in
 production.
 
 ```sh
-make test    # 105 tests, no model needed
+make test    # 164 tests, no model needed
 make lint
 ```
 
 The suite swaps in a fake engine that writes silent wav files, so it finishes in
 about a second. To hear real audio you need the model, which downloads to
 `~/.cache/supertonic3` on first use.
+
+The Docker image installs Python dependencies from `backend/requirements.txt`,
+which pins every transitive package with a hash and is installed under
+`pip --require-hashes`, so a build can't quietly pick up something else. It's
+generated from `pyproject.toml` — regenerate it whenever you change a dependency:
+
+```sh
+cd backend && uv pip compile pyproject.toml --generate-hashes --universal \
+  --python-version 3.12 -o requirements.txt
+```
 
 ## Putting it on the internet
 
@@ -212,6 +223,8 @@ likely to touch:
 | `ONEREAD_SAMPLE_MINUTES` | `1` | How much of a new entry gets read straight away. |
 | `ONEREAD_GENERATE_PER_HOUR` | `30` | Per user. |
 | `ONEREAD_PREVIEW_PER_HOUR` | `120` | Voice samples, per user. |
+| `ONEREAD_TEXT_PER_MINUTE` | `120` | The routes that reflow text without making audio, per user. |
+| `ONEREAD_CORS_ORIGINS` | empty | Only if the frontend is hosted on another origin. `*` is refused. |
 | `ONEREAD_TTS_STEPS` | `8` | More steps, slightly better audio, more CPU. |
 | `ONEREAD_PRELOAD_MODEL` | `true` | Load ONNX at startup so the first entry isn't slow. |
 

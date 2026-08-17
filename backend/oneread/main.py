@@ -80,10 +80,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.state.settings = settings
 
+    # `add_middleware` prepends, so these run in reverse: CORS, TrustedHost,
+    # SessionRefresh, SecurityHeaders, BodyLimit, GZip, then the routes.
+
     # The segment list for a long document is a few hundred kilobytes of text.
     app.add_middleware(GZipMiddleware, minimum_size=1024)
-    # Added last, so it runs first and a body over the limit is turned away
-    # before anything downstream has read it.
+    # Ahead of every route and of GZip, which is what matters: an oversized body
+    # is turned away before anything downstream has read it. The layers above
+    # this one all read headers only.
     app.add_middleware(
         BodyLimitMiddleware,
         limit=settings.max_request_bytes,
@@ -96,12 +100,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     if settings.allowed_hosts and settings.allowed_hosts != ["*"]:
         app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_hosts)
     if settings.cors_origins:
+        # Named origins only — the config refuses "*", because with credentials
+        # on, Starlette answers a wildcard by reflecting whichever origin asked.
+        # The header list is spelled out for the same reason: "*" on a preflight
+        # approves `X-Requested-With`, which is the whole CSRF guard.
         app.add_middleware(
             CORSMiddleware,
             allow_origins=settings.cors_origins,
             allow_credentials=True,
-            allow_methods=["*"],
-            allow_headers=["*"],
+            allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            allow_headers=["Content-Type", "X-Requested-With"],
         )
 
     _install_error_handlers(app)

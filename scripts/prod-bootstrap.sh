@@ -6,7 +6,8 @@
 #   cp .env.prod.example .env.prod && $EDITOR .env.prod
 #   ./scripts/prod-bootstrap.sh            (or: make prod-init)
 #
-# Pass --force-cert to throw away the existing certificate and issue a new one.
+# Pass --force-cert to throw away the existing certificate and issue a new one
+# (through make that is: make prod-init ARGS=--force-cert).
 
 set -eu
 
@@ -137,7 +138,7 @@ compose up -d --build
 say "Up. https://$ONEREAD_DOMAIN"
 if [ -n "$STAGING_ARG" ]; then
     printf '%s\n' "    That certificate is a staging one and browsers will refuse it."
-    printf '%s\n' "    Set CERTBOT_STAGING=0 in $ENV_FILE and run this again with --force-cert."
+    printf '%s\n' "    Set CERTBOT_STAGING=0 in $ENV_FILE, then:  make prod-init ARGS=--force-cert"
 fi
 printf '%s\n' "    The app needs about ninety seconds to load the model before it answers."
 printf '%s\n\n' "    Watch it come up:  make prod-logs"

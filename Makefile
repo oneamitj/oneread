@@ -40,8 +40,10 @@ docker-down: ## Stop it
 # keeping the certificate current. Everything reads .env.prod.
 PROD := docker compose -f docker-compose.prod.yml --env-file .env.prod
 
+# ARGS is passed through to the script, so a re-issue is:
+#   make prod-init ARGS=--force-cert
 prod-init: ## First run: data dir, first certificate, then bring it all up
-	./scripts/prod-bootstrap.sh
+	./scripts/prod-bootstrap.sh $(ARGS)
 
 prod-update: ## Rebuild and roll forward (this is the deploy)
 	$(PROD) up -d --build --remove-orphans

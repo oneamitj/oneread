@@ -35,6 +35,7 @@
   display: block;
   width: 9.5rem;
   height: auto;
+  margin-inline: auto;
 }
 
 .gate__lede {

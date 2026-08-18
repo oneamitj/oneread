@@ -11,6 +11,12 @@ from typing import Annotated
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
+from .pacing import (
+    DEFAULT_BLOCK_GAP_S,
+    DEFAULT_LINE_GAP_S,
+    DEFAULT_SENTENCE_GAP_S,
+)
+
 #: A list setting written as a comma-separated string rather than JSON.
 #:
 #: pydantic-settings runs `json.loads` over any list-typed field before a
@@ -87,7 +93,13 @@ class Settings(BaseSettings):
         "This is how I sound. Give me a paragraph and I'll read the whole thing."
     )
     preload_model: bool = True  # load ONNX at startup so the first entry isn't slow
-    silence_between_segments_s: float = 0.3
+    # Pacing. A paragraph is read through; the stop belongs at its end. The
+    # model also leaves its own silence on each clip, which is trimmed off
+    # first, so these are the pauses actually heard.
+    silence_between_sentences_s: float = DEFAULT_SENTENCE_GAP_S
+    silence_between_lines_s: float = DEFAULT_LINE_GAP_S
+    silence_between_blocks_s: float = DEFAULT_BLOCK_GAP_S
+    trim_segment_silence: bool = True
 
     # --- uploads ------------------------------------------------------------
     #: Refused outright above this. 25 MB is a long book as a PDF.

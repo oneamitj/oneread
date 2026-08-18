@@ -11,7 +11,8 @@ from sqlalchemy.orm import sessionmaker
 from oneread import db as db_module
 from oneread.config import Settings, get_settings, set_settings
 from oneread.main import create_app
-from oneread.segmenter import segment_text
+from oneread.pacing import gap_after
+from oneread.segmenter import segment_spans
 from oneread.tts_engine import Synthesis, TTSEngine, set_engine
 from oneread.visits import VisitCounter, set_counter
 from oneread.worker import Worker, set_worker
@@ -80,11 +81,10 @@ class FakeEngine(TTSEngine):
         if self.crash_with is not None:
             raise self.crash_with
 
-        every = segment_text(text, lang=lang)
+        every = segment_spans(text, lang=lang)
         segments = every[start_segment:end_segment]
         if not segments:
             raise SynthesisError("That range doesn't cover any text.")
-        gap = self.settings.silence_between_segments_s
         cues: list[dict] = []
         cursor = 0.0
         done = 0
@@ -92,7 +92,8 @@ class FakeEngine(TTSEngine):
         complete = True
         reason = "complete"
 
-        for index, segment in enumerate(segments):
+        for index, span in enumerate(segments):
+            segment = span.text
             if self.hold is not None and index == self.hold_at:
                 # Signal only once we're parked, so a test that waits on this
                 # knows exactly how many sentences exist.
@@ -126,7 +127,12 @@ class FakeEngine(TTSEngine):
                     on_progress(done, len(segments), cursor)
                 break
             if index < len(segments) - 1:
-                cursor += gap
+                cursor += gap_after(
+                    span.ends,
+                    sentence_s=self.settings.silence_between_sentences_s,
+                    line_s=self.settings.silence_between_lines_s,
+                    block_s=self.settings.silence_between_blocks_s,
+                )
             if on_progress is not None:
                 on_progress(done, len(segments), cursor)
 

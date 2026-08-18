@@ -206,6 +206,10 @@ Every setting is an environment variable prefixed `ONEREAD_`, or a line in
 | `ONEREAD_PUBLIC_SITE` | `false` | Let crawlers in, and drop the `noindex` from `/about`. |
 | `ONEREAD_PUBLIC_URL` | empty | This instance's address, for canonical links and the sitemap. |
 | `ONEREAD_TTS_STEPS` | `8` | More steps, slightly better audio, more CPU. |
+| `ONEREAD_SILENCE_BETWEEN_SENTENCES_S` | `0.15` | Pause at a full stop inside a paragraph. |
+| `ONEREAD_SILENCE_BETWEEN_LINES_S` | `0.35` | Pause after a line that stands on its own. |
+| `ONEREAD_SILENCE_BETWEEN_BLOCKS_S` | `0.55` | Pause after a paragraph, heading or list item. |
+| `ONEREAD_TRIM_SEGMENT_SILENCE` | `true` | Cut the model's own padding so the pauses above are what's heard. |
 | `ONEREAD_PRELOAD_MODEL` | `true` | Load ONNX at startup. |
 | `ONEREAD_COUNT_VISITS` | `true` | The cookieless daily headcount behind `make stats`. |
 | `ONEREAD_VISITS_FLUSH_INTERVAL_S` | `60` | How much of it a crash can cost. |

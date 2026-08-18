@@ -10,14 +10,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .segmenter import segment_text
+from .pacing import DEFAULT_SENTENCE_GAP_S, total_gap_s
+from .segmenter import Segment, segment_spans
 
 # Fallbacks for the very first estimate, measured on an M-series laptop:
 # 3,120 characters produced 230.9 s of audio in 53.2 s at speed 1.05.
 BASE_SECONDS_PER_CHAR = 0.0683
 BASE_SPEED = 1.05
 BASE_WALL_PER_AUDIO_SECOND = 0.231
-GAP_S = 0.3
 
 
 @dataclass(frozen=True)
@@ -36,7 +36,10 @@ class Calibration:
         """Back out the per-character rate from one finished rendition."""
         if spoken_chars < 200 or duration_s <= 0 or wall_s <= 0:
             return None  # too small to learn anything reliable from
-        speech = max(0.0, duration_s - max(0, segments - 1) * GAP_S)
+        # Only the segment count survives on a rendition, not where its
+        # paragraphs ended, so this takes the shorter gap and reads the rate a
+        # touch slow. It is a floor, and it corrects itself as readings land.
+        speech = max(0.0, duration_s - max(0, segments - 1) * DEFAULT_SENTENCE_GAP_S)
         if speech <= 0:
             return None
         # Normalise to the reference speed so the rate transfers to other speeds.
@@ -77,11 +80,26 @@ def estimate(
     speed: float,
     calibration: Calibration | None = None,
 ) -> Estimate:
+    return estimate_spans(
+        segment_spans(spoken, lang=lang), speed=speed, calibration=calibration
+    )
+
+
+def estimate_spans(
+    segments: list[Segment],
+    *,
+    speed: float,
+    calibration: Calibration | None = None,
+) -> Estimate:
+    """The same answer for pieces already segmented — a slider range, say.
+
+    Going back through text would lose where the paragraphs were, and with them
+    the difference between a breath and a stop.
+    """
     rates = calibration or Calibration()
-    segments = segment_text(spoken, lang=lang)
-    characters = sum(len(segment) for segment in segments)
+    characters = sum(len(segment.text) for segment in segments)
     per_char = rates.seconds_per_char * (BASE_SPEED / max(speed, 0.1))
-    audio_s = characters * per_char + max(0, len(segments) - 1) * GAP_S
+    audio_s = characters * per_char + total_gap_s(segments)
     return Estimate(
         audio_s=round(audio_s, 1),
         wall_s=round(audio_s * rates.wall_per_audio_second, 1),

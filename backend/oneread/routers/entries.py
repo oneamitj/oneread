@@ -14,10 +14,11 @@ from sqlalchemy.orm import Session
 from ..auth import CurrentUser, require_csrf
 from ..config import Settings, get_settings
 from ..db import get_session
-from ..estimates import GAP_S
 from ..estimates import estimate as estimate_cost
+from ..estimates import estimate_spans
 from ..markdown_speech import to_speech
 from ..models import LIVE_STATUSES, Entry, Rendition, pick_default, utcnow
+from ..pacing import gap_after
 from ..ratelimit import RateLimiter, enforce
 from ..schemas import (
     EntryIn,
@@ -33,7 +34,7 @@ from ..schemas import (
     SourceFile,
 )
 from ..security import content_disposition
-from ..segmenter import segment_text
+from ..segmenter import segment_spans
 from ..subtitles import slugify
 from ..worker import Worker, calibration_for, get_worker
 from .uploads import claim, forget
@@ -597,23 +598,25 @@ def entry_segments(
     enforce(limiter, user.id, TOO_MUCH_TEXT_WORK)
     entry = _owned(session, entry_id, user.id)
     rates = calibration_for(session, user.id, entry_id)
-    pieces = segment_text(_spoken_of(entry), lang=entry.lang)
+    pieces = segment_spans(_spoken_of(entry), lang=entry.lang)
 
     cursor = 0.0
     out: list[SegmentOut] = []
     for index, piece in enumerate(pieces):
-        one = estimate_cost(piece, lang=entry.lang, speed=speed or entry.speed,
-                            calibration=rates)
+        one = estimate_spans([piece], speed=speed or entry.speed, calibration=rates)
         out.append(
             SegmentOut(
                 i=index,
-                text=piece,
-                chars=len(piece),
+                text=piece.text,
+                chars=len(piece.text),
                 start_s=round(cursor, 2),
                 end_s=round(cursor + one.audio_s, 2),
             )
         )
-        cursor += one.audio_s + (GAP_S if index < len(pieces) - 1 else 0.0)
+        if index < len(pieces) - 1:
+            cursor += one.audio_s + gap_after(piece.ends)
+        else:
+            cursor += one.audio_s
 
     return SegmentList(segments=out, audio_s=round(cursor, 1), measured=rates.measured)
 
@@ -635,20 +638,22 @@ def estimate_entry(
     enforce(limiter, user.id, TOO_MUCH_TEXT_WORK)
     entry = _owned(session, entry_id, user.id)
     spoken = _spoken_of(entry)
+    rates = calibration_for(session, user.id, entry_id)
+    wanted = speed if speed is not None else entry.speed
     if scope == "range":
-        pieces = segment_text(spoken, lang=entry.lang)[start:end]
-        spoken = "\n\n".join(pieces)
-        if not spoken:
+        # Estimated from the pieces themselves: rejoining them into text would
+        # lose where the paragraphs ended, and with them the long pauses.
+        pieces = segment_spans(spoken, lang=entry.lang)[start:end]
+        if not pieces:
             raise HTTPException(
                 status.HTTP_422_UNPROCESSABLE_CONTENT,
                 "That range doesn't cover any text.",
             )
-    guess = estimate_cost(
-        spoken,
-        lang=entry.lang,
-        speed=speed if speed is not None else entry.speed,
-        calibration=calibration_for(session, user.id, entry_id),
-    )
+        guess = estimate_spans(pieces, speed=wanted, calibration=rates)
+    else:
+        guess = estimate_cost(
+            spoken, lang=entry.lang, speed=wanted, calibration=rates
+        )
     if scope == "sample":
         guess = guess.capped((minutes or settings.sample_minutes) * 60)
     return EstimateOut(

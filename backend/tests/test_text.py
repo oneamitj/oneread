@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from oneread.segmenter import MAX_SEGMENT_CHARS, segment_text
+from oneread.markdown_speech import to_speech
+from oneread.segmenter import (
+    MAX_SEGMENT_CHARS,
+    segment_spans,
+    segment_text,
+)
 from oneread.subtitles import slugify, to_srt, to_vtt
 
 
@@ -55,6 +60,64 @@ def test_paragraphs_stay_apart():
 
 def test_empty_text_gives_nothing():
     assert segment_text("   ") == []
+
+
+def _blocks(text: str, lang: str | None = None) -> list[bool]:
+    return [span.ends_block for span in segment_spans(text, lang)]
+
+
+def _ends(text: str, lang: str | None = None) -> list[str]:
+    return [span.ends for span in segment_spans(text, lang)]
+
+
+def test_only_the_last_sentence_of_a_paragraph_closes_it():
+    text = "Warm the pan. Add butter.\n\nThen the eggs go in. Stir slowly."
+    assert _blocks(text) == [False, True, False, True]
+
+
+def test_a_lone_sentence_closes_its_paragraph():
+    assert _blocks("All there is to say.") == [True]
+
+
+def test_splitting_an_over_long_sentence_moves_the_block_end_to_the_last_piece():
+    flags = _blocks("word " * 300)
+    assert flags[-1] is True
+    assert not any(flags[:-1])
+
+
+def test_a_stub_does_not_swallow_the_next_paragraph():
+    text = "Yes.\n\nThe oven needs twenty minutes to warm up."
+    assert segment_text(text) == ["Yes.", "The oven needs twenty minutes to warm up."]
+    assert _blocks(text) == [True, True]
+
+
+def test_a_line_that_finishes_a_sentence_gets_its_own_pause():
+    text = "Warm the pan.\nAdd the butter.\nWait for it to foam."
+    assert _ends(text) == ["line", "line", "block"]
+
+
+def test_a_newline_mid_sentence_is_only_a_wrap():
+    text = (
+        "Warm the pan over a low flame and wait until the\n"
+        "butter stops foaming. Then crack three eggs into\n"
+        "a bowl and beat them well."
+    )
+    assert segment_text(text) == [
+        "Warm the pan over a low flame and wait until the butter stops foaming.",
+        "Then crack three eggs into a bowl and beat them well.",
+    ]
+    assert _ends(text) == ["sentence", "block"]
+
+
+def test_lines_that_never_finish_a_sentence_are_read_one_by_one():
+    """A shopping list, an address, a verse: the newline is the whole point."""
+    assert _ends("Eggs\nButter\nSalt") == ["line", "line", "block"]
+    assert segment_text("Eggs\nButter\nSalt") == ["Eggs", "Butter", "Salt"]
+
+
+def test_every_markdown_list_item_ends_a_block():
+    spoken = to_speech("- First point\n- Second point\n", "markdown")
+    assert _blocks(spoken) == [True, True]
 
 
 CUES = [

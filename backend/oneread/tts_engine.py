@@ -18,7 +18,7 @@ import numpy as np
 import soundfile as sf
 
 from .config import Settings, get_settings
-from .segmenter import max_chars_for, segment_text
+from .segmenter import BLOCK, LINE, SENTENCE, max_chars_for, segment_spans
 
 log = logging.getLogger("oneread.tts")
 
@@ -40,6 +40,37 @@ MIN_SPEED = 0.7
 MAX_SPEED = 2.0
 
 _SPACES = re.compile(r"[ \t]+")
+
+
+_TRIM_FRAME_S = 0.010  # granularity of the silence hunt
+_TRIM_FLOOR = 4e-4  # absolute quiet, so a soft voice isn't shredded
+_TRIM_RELATIVE = 0.01  # ...and 40 dB under this clip's own peak
+_TRIM_HEAD_S = 0.010  # kept before the first sound
+_TRIM_TAIL_S = 0.040  # kept after the last, room for a fricative to die
+
+
+def trim_silence(wav: np.ndarray, sample_rate: int) -> np.ndarray:
+    """Cut a clip's lead-in and tail so the gap we add is the gap heard.
+
+    The model pads its own silence onto every utterance: the latent is rounded
+    up to a whole chunk, and the duration predictor writes a pause of its own
+    for the full stop. Left in, that stacks on top of the silence between
+    pieces and a paragraph reads like a list. Taken off, the pause is exactly
+    what `pacing` asked for.
+    """
+    frame = max(1, int(_TRIM_FRAME_S * sample_rate))
+    usable = (wav.shape[0] // frame) * frame
+    if usable < frame:
+        return wav
+
+    peaks = np.abs(wav[:usable]).reshape(-1, frame).max(axis=1)
+    loud = np.flatnonzero(peaks > max(_TRIM_FLOOR, float(peaks.max()) * _TRIM_RELATIVE))
+    if loud.size == 0:
+        return wav  # nothing but silence; not ours to throw away
+
+    start = max(0, loud[0] * frame - int(_TRIM_HEAD_S * sample_rate))
+    end = min(wav.shape[0], (loud[-1] + 1) * frame + int(_TRIM_TAIL_S * sample_rate))
+    return wav[start:end]
 
 
 class SynthesisError(RuntimeError):
@@ -191,10 +222,19 @@ class TTSEngine:
 
         style = self._style(voice)
         steps = self.settings.tts_steps
-        gap_samples = int(self.settings.silence_between_segments_s * tts.sample_rate)
-        silence = np.zeros(gap_samples, dtype=np.float32)
+        pauses = {
+            kind: np.zeros(
+                int(seconds * tts.sample_rate),
+                dtype=np.float32,
+            )
+            for kind, seconds in (
+                (SENTENCE, self.settings.silence_between_sentences_s),
+                (LINE, self.settings.silence_between_lines_s),
+                (BLOCK, self.settings.silence_between_blocks_s),
+            )
+        }
 
-        every_segment = segment_text(text, lang=lang)
+        every_segment = segment_spans(text, lang=lang)
         start_segment = max(0, min(start_segment, len(every_segment)))
         segments = every_segment[start_segment:end_segment]
         if not segments:
@@ -219,7 +259,8 @@ class TTSEngine:
                 channels=1,
                 subtype="PCM_16",
             ) as sink:
-                for index, segment in enumerate(segments):
+                for index, span in enumerate(segments):
+                    segment = span.text
                     stop = should_stop() if should_stop is not None else None
                     if stop == DISCARD:
                         raise Cancelled()
@@ -237,8 +278,12 @@ class TTSEngine:
                     if wav.shape[0] != 1:
                         raise SynthesisError(f"Model returned an odd shape: {wav.shape}")
 
+                    clip = wav.squeeze(axis=0)
+                    if self.settings.trim_segment_silence:
+                        clip = trim_silence(clip, tts.sample_rate)
+
                     start = cursor / tts.sample_rate
-                    cursor += wav.shape[1]
+                    cursor += clip.shape[0]
                     end = cursor / tts.sample_rate
                     cues.append(
                         {
@@ -248,7 +293,7 @@ class TTSEngine:
                             "text": segment,
                         }
                     )
-                    sink.write(wav.squeeze(axis=0))
+                    sink.write(clip)
                     spoken_chars += len(segment)
                     done = index + 1
 
@@ -259,9 +304,13 @@ class TTSEngine:
                             on_progress(done, len(segments), end)
                         break
 
-                    if index < len(segments) - 1 and gap_samples:
-                        sink.write(silence)
-                        cursor += gap_samples
+                    if index < len(segments) - 1:
+                        # A full stop mid-paragraph earns a breath; a line or
+                        # a paragraph earns a stop.
+                        pause = pauses[span.ends]
+                        if pause.size:
+                            sink.write(pause)
+                            cursor += pause.size
 
                     if on_progress is not None:
                         on_progress(done, len(segments), end)

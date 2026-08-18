@@ -109,6 +109,30 @@ def test_document_with_only_decoration_reads_as_nothing():
     assert to_speech("---\n\n***\n", "markdown") == ""
 
 
+def test_a_symbol_with_no_pronunciation_is_dropped_not_refused():
+    """A pasted arrow used to fail the whole entry. Now it just isn't read."""
+    assert to_speech("First step ↳ second step.", "plain") == "First step second step."
+    assert to_speech("Ship it 🚀 today.", "plain") == "Ship it today."
+    assert to_speech("Careful ⚠ here.", "plain") == "Careful here."
+
+
+def test_invisible_characters_leave_no_gap_behind():
+    assert to_speech("soft\xadhyphen", "plain") == "softhyphen"
+    assert to_speech("zero​width", "plain") == "zerowidth"
+    assert to_speech("broken � encoding", "plain") == "broken encoding"
+
+
+def test_symbols_with_words_survive_the_strip():
+    """The map runs first, so a pictograph that has something to say keeps it."""
+    assert to_speech("It hit 40°C.", "plain") == "It hit 40 degrees C."
+    assert to_speech("OneRead©", "plain") == "OneRead copyright"
+    assert to_speech("Tests ✓ passing.", "plain") == "Tests yes passing."
+
+
+def test_dropping_a_symbol_does_not_run_words_together():
+    assert to_speech("north★south", "plain") == "north south"
+
+
 def test_whitespace_is_normalised():
     assert to_speech("too    many\t\tspaces\n\n\n\n\ngaps", "plain") == (
         "too many spaces\n\ngaps"

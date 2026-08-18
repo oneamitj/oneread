@@ -53,10 +53,10 @@ def test_preview_needs_a_session_and_the_origin_header(client):
 
 def test_preview_failure_is_reported(client, engine):
     sign_in(client)
-    engine.fail_with = "These characters can't be spoken: '☃'"
+    engine.fail_with = "There is no text to read."
     response = client.post("/api/preview", json=SAMPLE)
     assert response.status_code == 422
-    assert "can't be spoken" in response.json()["message"]
+    assert "no text to read" in response.json()["message"]
 
 
 def test_sample_line_falls_back_and_clips():

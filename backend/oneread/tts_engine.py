@@ -8,6 +8,7 @@ mostly fight the first for CPU. One worker thread, one job at a time.
 from __future__ import annotations
 
 import logging
+import re
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -37,6 +38,8 @@ VOICE_IDS = {voice["id"] for voice in VOICES}
 
 MIN_SPEED = 0.7
 MAX_SPEED = 2.0
+
+_SPACES = re.compile(r"[ \t]+")
 
 
 class SynthesisError(RuntimeError):
@@ -126,6 +129,26 @@ class TTSEngine:
         ok, unsupported = self.tts.model.text_processor.validate_text(text)
         return [] if ok else list(unsupported)
 
+    def speakable(self, text: str) -> str:
+        """Drop what this model can't pronounce instead of refusing the text.
+
+        `markdown_speech` has already taken out the marks no voice could say;
+        this is the backstop for whatever is specific to the loaded model, and it
+        stays quiet because a reader has no way of acting on it anyway.
+        """
+        unsupported = self.check_text(text)
+        if not unsupported:
+            return text
+        log.info(
+            "dropping %d unspeakable character(s): %s",
+            len(unsupported),
+            " ".join(repr(char) for char in unsupported[:8]),
+        )
+        blanked = _SPACES.sub(" ", text.translate({ord(char): " " for char in unsupported}))
+        # Line by line, so the gap a dropped character leaves at the end of one
+        # doesn't survive as trailing space in a subtitle cue.
+        return "\n".join(line.strip() for line in blanked.split("\n")).strip()
+
     def synthesize_to_file(
         self,
         text: str,
@@ -154,14 +177,9 @@ class TTSEngine:
         `end_segment` read a slice instead, counted in sentences so a range
         begins and ends on a whole one.
         """
-        text = text.strip()
+        text = self.speakable(text.strip())
         if not text:
             raise SynthesisError("There is no text to read.")
-
-        unsupported = self.check_text(text)
-        if unsupported:
-            shown = " ".join(repr(c) for c in unsupported[:8])
-            raise SynthesisError(f"These characters can't be spoken: {shown}")
 
         tts = self.tts
         effective_lang = lang if tts.is_multilingual else None

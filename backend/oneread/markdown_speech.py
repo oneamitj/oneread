@@ -34,16 +34,42 @@ SPOKEN_SYMBOLS = {
     "→": " to ",
     "←": " from ",
     "↔": " to and from ",
+    "↑": " up ",
+    "↓": " down ",
+    "↦": " maps to ",
     "⇒": " implies ",
+    "⇐": " is implied by ",
+    "⇔": " if and only if ",
+    "⇑": " up ",
+    "⇓": " down ",
     "±": " plus or minus ",
     "×": " times ",
     "÷": " divided by ",
     "∞": " infinity ",
     "√": " square root of ",
     "∑": " sum of ",
+    "∫": " integral of ",
     "≡": " identical to ",
+    "≪": " much less than ",
+    "≫": " much greater than ",
+    "∈": " in ",
+    "∉": " not in ",
+    "⊂": " is a subset of ",
+    "⊃": " contains ",
+    "∪": " union ",
+    "∩": " intersection ",
+    "∴": " therefore ",
+    "∵": " because ",
+    "¬": " not ",
     "°": " degrees ",
     "µ": " micro",
+    "‰": " per mille ",
+    "©": " copyright ",
+    "®": " registered ",
+    "✓": " yes ",
+    "✔": " yes ",
+    "✗": " no ",
+    "✘": " no ",
     "†": " ",
     "‡": " ",
     "§": " section ",
@@ -54,13 +80,30 @@ SPOKEN_SYMBOLS = {
     "—": ", ",
     "–": ", ",
     "―": ", ",
+    "‒": ", ",
+    "‑": "-",
+    "′": " ",
+    "″": " ",
     "…": "…",
     " ": " ",
     "​": "",
     "‌": "",
     "‍": "",
     "﻿": "",
+    " ": "\n",
+    " ": "\n\n",
+    "�": "",
 }
+
+#: Characters that carry no sound at all: controls, joiners and formatting marks,
+#: surrogates, private-use and unassigned codepoints. Deleted outright, since
+#: they take up no width on the page either.
+_SILENT = frozenset({"Cc", "Cf", "Cs", "Co", "Cn"})
+
+#: Visible marks with no pronunciation: emoji, decorative arrows, box drawing,
+#: bare accents. Replaced with a space rather than deleted, so losing one doesn't
+#: run the words on either side of it together.
+_WORDLESS = frozenset({"So", "Sk"})
 
 _HTML_TAG = re.compile(r"<[^>]{0,200}>")
 _CHECKBOX = re.compile(r"^\[([ xX])\]\s*")
@@ -84,9 +127,33 @@ def _tidy(text: str) -> str:
     for symbol, spoken in SPOKEN_SYMBOLS.items():
         if symbol in text:
             text = text.replace(symbol, spoken)
+    # After the map, never before: ° and ✓ are pictographs too, and they have
+    # words to say.
+    text = _strip_unspeakable(text)
     text = _SPACES.sub(" ", text)
     text = "\n".join(line.strip() for line in text.split("\n"))
     return _BLANKS.sub("\n\n", text).strip()
+
+
+def _strip_unspeakable(text: str) -> str:
+    """Drop what a voice has no way of saying, quietly.
+
+    A reader who pastes a document shouldn't have to hunt through it for a stray
+    arrow or emoji: the character goes, the rest of the sentence is read. Only
+    marks with no pronunciation are touched — letters, digits and punctuation
+    from every script are left alone, and so is anything `SPOKEN_SYMBOLS` has
+    already turned into words.
+    """
+    kept: list[str] = []
+    for char in text:
+        if char in "\n\t":  # both are controls, and both mean something here
+            kept.append(char)
+            continue
+        category = unicodedata.category(char)
+        if category in _SILENT:
+            continue
+        kept.append(" " if category in _WORDLESS else char)
+    return "".join(kept)
 
 
 def _sentence(text: str) -> str:

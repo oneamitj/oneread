@@ -72,6 +72,7 @@ class FakeEngine(TTSEngine):
                 "end_segment": end_segment,
             }
         )
+        text = self.speakable(text)
         if self.hold is None:
             self.started.set()
         if self.fail_with:

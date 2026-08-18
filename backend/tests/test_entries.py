@@ -63,10 +63,10 @@ def test_audio_and_subtitles_download(client):
 
 def test_a_failed_reading_says_why(client, engine):
     sign_in(client)
-    engine.fail_with = "These characters can't be spoken: '\\u2603'"
+    engine.fail_with = "There is no text to read."
     entry = create(client)
     failed = wait_for(client, entry["id"], status="failed")
-    assert "can't be spoken" in failed["error"]
+    assert "no text to read" in failed["error"]
     assert client.get(f"/api/renditions/{failed['id']}/audio").status_code == 409
 
 
@@ -285,3 +285,12 @@ def test_markdown_with_no_words_fails_with_a_reason(client):
     entry = create(client, body="---\n\n***\n", format="markdown")
     failed = wait_for(client, entry["id"], status="failed")
     assert "no words left to read" in failed["error"]
+
+
+def test_characters_a_voice_cannot_say_do_not_fail_the_reading(client, engine):
+    """A stray arrow in pasted text is dropped, not turned into an error."""
+    sign_in(client)
+    entry = create(client, body="Warm the pan ↳ first. Then 🧈 goes in.")
+    reading = wait_for(client, entry["id"])
+    assert reading["error"] is None
+    assert engine.calls[-1]["text"] == "Warm the pan first. Then goes in."

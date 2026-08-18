@@ -53,6 +53,7 @@ prod-init: ## First run: data dir, first certificate, then bring it all up
 
 prod-update: ## Rebuild and roll forward (this is the deploy)
 	$(PROD) up -d --build --remove-orphans
+	$(MAKE) prod-nginx-apply
 	docker image prune -f
 
 prod-logs: ## Follow the logs
@@ -77,6 +78,20 @@ prod-cert-renew: ## Renew the certificate now instead of waiting for the timer
 prod-nginx-check: ## Parse the nginx config as the running container sees it
 	$(PROD) exec nginx nginx -t
 
+# Editing deploy/nginx/templates/ and running prod-update is not enough on its
+# own, and the half-applied deploy that follows is hard to read: the app moves,
+# nginx doesn't. The templates are a bind mount, so compose
+# sees no change to the nginx service and leaves the container running; and the
+# rendered config lives in a tmpfs the image's entrypoint fills once, at start.
+# `nginx -s reload` then re-reads that same stale file. So the render is run
+# again explicitly and only then reloaded, which is graceful — no connection is
+# dropped and the certificate is untouched. `up -d --force-recreate nginx` is
+# the bigger hammer if the image ever moves that script.
+prod-nginx-apply: ## Re-render the nginx templates and reload onto them
+	$(PROD) exec nginx /docker-entrypoint.d/20-envsubst-on-templates.sh
+	$(PROD) exec nginx nginx -t
+	$(PROD) exec nginx nginx -s reload
+
 # A plain tar of a live SQLite file can catch it mid-write and restore as a
 # corrupt database, so the database is snapshotted through SQLite's own online
 # backup first and the live files are left out of the archive. Restoring means
@@ -98,4 +113,4 @@ src.backup(dst); dst.close(); src.close()"
 
 .PHONY: help install dev-backend dev-frontend test lint build stats serve docker-up docker-down \
         prod-init prod-update prod-logs prod-ps prod-stats prod-restart prod-down \
-        prod-cert-renew prod-nginx-check prod-backup
+        prod-cert-renew prod-nginx-check prod-nginx-apply prod-backup

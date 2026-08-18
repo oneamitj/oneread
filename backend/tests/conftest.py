@@ -12,7 +12,7 @@ from oneread import db as db_module
 from oneread.config import Settings, get_settings, set_settings
 from oneread.main import create_app
 from oneread.pacing import gap_after
-from oneread.segmenter import segment_spans
+from oneread.segmenter import BY_PARAGRAPH, BY_SENTENCE, group_spans, segment_spans
 from oneread.tts_engine import Synthesis, TTSEngine, set_engine
 from oneread.visits import VisitCounter, set_counter
 from oneread.worker import Worker, set_worker
@@ -57,6 +57,7 @@ class FakeEngine(TTSEngine):
         limit_s=None,
         start_segment=0,
         end_segment=None,
+        mode=BY_SENTENCE,
         on_progress=None,
         should_stop=None,
     ) -> Synthesis:
@@ -71,6 +72,7 @@ class FakeEngine(TTSEngine):
                 "limit_s": limit_s,
                 "start_segment": start_segment,
                 "end_segment": end_segment,
+                "mode": mode,
             }
         )
         text = self.speakable(text)
@@ -82,11 +84,14 @@ class FakeEngine(TTSEngine):
             raise self.crash_with
 
         every = segment_spans(text, lang=lang)
-        segments = every[start_segment:end_segment]
-        if not segments:
+        sentences = every[start_segment:end_segment]
+        if not sentences:
             raise SynthesisError("That range doesn't cover any text.")
+        segments = group_spans(sentences) if mode == BY_PARAGRAPH else sentences
+        total = len(sentences)
         cues: list[dict] = []
         cursor = 0.0
+        sentence = start_segment
         done = 0
         spoken_chars = 0
         complete = True
@@ -110,21 +115,22 @@ class FakeEngine(TTSEngine):
             length = max(0.25, len(segment) * 0.06 / speed)
             cues.append(
                 {
-                    "i": start_segment + index,
+                    "i": sentence,
                     "start": round(cursor, 3),
                     "end": round(cursor + length, 3),
                     "text": segment,
                 }
             )
             cursor += length
-            done = index + 1
+            sentence += span.parts
+            done = sentence - start_segment
             spoken_chars += len(segment)
 
             if limit_s is not None and cursor >= limit_s:
-                complete = done >= len(segments)
+                complete = done >= total
                 reason = "complete" if complete else "limit"
                 if on_progress is not None:
-                    on_progress(done, len(segments), cursor)
+                    on_progress(done, total, cursor)
                 break
             if index < len(segments) - 1:
                 cursor += gap_after(
@@ -134,7 +140,7 @@ class FakeEngine(TTSEngine):
                     block_s=self.settings.silence_between_blocks_s,
                 )
             if on_progress is not None:
-                on_progress(done, len(segments), cursor)
+                on_progress(done, total, cursor)
 
         if not cues:
             raise Cancelled()
@@ -150,11 +156,11 @@ class FakeEngine(TTSEngine):
             duration_s=round(cursor, 3),
             cues=cues,
             segments_done=done,
-            segments_total=len(segments),
+            segments_total=total,
             spoken_chars=spoken_chars,
             document_segments=len(every),
             opening=cues[0]["text"][:160] if cues else "",
-            complete=complete and start_segment == 0 and len(segments) == len(every),
+            complete=complete and start_segment == 0 and total == len(every),
             reason=reason,
         )
 

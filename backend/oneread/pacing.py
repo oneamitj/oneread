@@ -19,6 +19,12 @@ DEFAULT_SENTENCE_GAP_S = 0.15  # a breath at a full stop
 DEFAULT_LINE_GAP_S = 0.35  # one line of a list, an address, a poem
 DEFAULT_BLOCK_GAP_S = 0.55  # end of a paragraph, heading or list item
 
+#: What the model leaves between two sentences it was given together. Measured
+#: on supertonic-3: 0.24-0.42 s at a full stop, against 0.08-0.16 s at a comma.
+#: Nothing sets this — it is what the model does — but an estimate has to allow
+#: for it, because a chunked reading is that much longer than the words alone.
+MODEL_INNER_GAP_S = 0.3
+
 
 def gap_after(
     ends: str,

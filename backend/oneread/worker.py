@@ -15,6 +15,7 @@ from .db import session_scope
 from .estimates import Calibration
 from .markdown_speech import to_speech
 from .models import Entry, Rendition, utcnow
+from .segmenter import BY_SENTENCE
 from .tts_engine import DISCARD, KEEP, Cancelled, SynthesisError, TTSEngine, get_engine
 
 log = logging.getLogger("oneread.worker")
@@ -26,7 +27,12 @@ def audio_path_for(user_id: str, entry_id: str, rendition_id: str) -> Path:
     return get_settings().audio_dir / user_id / entry_id / f"{rendition_id}.wav"
 
 
-def calibration_for(session, user_id: str, entry_id: str | None = None) -> Calibration:
+def calibration_for(
+    session,
+    user_id: str,
+    entry_id: str | None = None,
+    mode: str = BY_SENTENCE,
+) -> Calibration:
     """Learn the machine's pace from finished work, newest first."""
     statement = (
         select(Rendition)
@@ -39,8 +45,9 @@ def calibration_for(session, user_id: str, entry_id: str | None = None) -> Calib
         .limit(8)
     )
     rows = list(session.scalars(statement))
-    # Prefer this entry's own history: same text, same voice, closest match.
-    rows.sort(key=lambda r: (r.entry_id != entry_id,))
+    # Prefer this entry's own history, and a reading cut up the same way: same
+    # text, same voice, same pauses, closest match.
+    rows.sort(key=lambda r: (r.entry_id != entry_id, r.mode != mode))
     for rendition in rows:
         learned = Calibration.from_rendition(
             spoken_chars=rendition.spoken_chars,
@@ -48,6 +55,7 @@ def calibration_for(session, user_id: str, entry_id: str | None = None) -> Calib
             wall_s=rendition.wall_s or 0.0,
             speed=rendition.speed,
             segments=rendition.segments_done,
+            mode=rendition.mode,
         )
         if learned is not None:
             return learned
@@ -160,6 +168,7 @@ class Worker:
                 "limit_s": rendition.limit_s,
                 "start_segment": rendition.start_segment,
                 "end_segment": rendition.end_segment,
+                "mode": rendition.mode,
             }
 
         if not job["text"].strip():
@@ -209,6 +218,7 @@ class Worker:
                 limit_s=job["limit_s"],
                 start_segment=job["start_segment"],
                 end_segment=job["end_segment"],
+                mode=job["mode"],
                 on_progress=on_progress,
                 should_stop=should_stop,
             )

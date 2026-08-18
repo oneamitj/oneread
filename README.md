@@ -25,6 +25,15 @@ per-character billing. The model is ~385 MB and is baked into the Docker image.
   picked with a two-handled slider, or the whole document. Each has its own
   player, subtitles and delete button. A new entry gets a sample automatically,
   so nobody spends half an hour of CPU to find out the voice was wrong.
+- **Refined reading (experimental).** Every recording is normally made one
+  sentence per call to the model, which is what keeps a subtitle line to a
+  sentence. Pick *Refined* instead and it gets up to 350 characters of whole
+  sentences at a time, so it places the pauses between them itself and the
+  intonation carries across a paragraph. Subtitles still line up exactly, but a
+  cue then covers the whole group. 400 characters is the wall: past it
+  Supertonic's single duration prediction stops growing and the speech is
+  rushed. Everything is still counted in sentences, so ranges, coverage and
+  progress mean the same in both.
 - **Estimates.** Audio length and wall clock, shown before you commit and
   calibrated from readings this machine has already finished.
 - **Stopping.** A full reading freezes the entry while it runs. Stop keeps what
@@ -210,6 +219,7 @@ Every setting is an environment variable prefixed `ONEREAD_`, or a line in
 | `ONEREAD_SILENCE_BETWEEN_LINES_S` | `0.35` | Pause after a line that stands on its own. |
 | `ONEREAD_SILENCE_BETWEEN_BLOCKS_S` | `0.55` | Pause after a paragraph, heading or list item. |
 | `ONEREAD_TRIM_SEGMENT_SILENCE` | `true` | Cut the model's own padding so the pauses above are what's heard. |
+| `ONEREAD_PARAGRAPH_CHUNK_CHARS` | `350` | How much text a *refined* reading hands the voice at once. 400 is the ceiling. |
 | `ONEREAD_PRELOAD_MODEL` | `true` | Load ONNX at startup. |
 | `ONEREAD_COUNT_VISITS` | `true` | The cookieless daily headcount behind `make stats`. |
 | `ONEREAD_VISITS_FLUSH_INTERVAL_S` | `60` | How much of it a crash can cost. |

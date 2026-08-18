@@ -139,6 +139,9 @@ class Rendition(Base):
     user_id: Mapped[str] = mapped_column(String(32), index=True)
 
     scope: Mapped[str] = mapped_column(String(16), default="sample")
+    # How the text was cut up: "sentence" is one sentence per synthesis call,
+    # "paragraph" hands the model several at a time. See `segmenter`.
+    mode: Mapped[str] = mapped_column(String(16), default="sentence")
     # Where a sample stops, in seconds of audio. Null means read to the end.
     limit_s: Mapped[int | None] = mapped_column(Integer, default=None)
     # For a range: the half-open span of sentences that was read.

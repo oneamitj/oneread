@@ -121,6 +121,7 @@ export const api = {
   /** What a reading will cost, before anyone commits half an hour of CPU to it. */
   estimate: (id: string, plan: ReadingRequest) => {
     const params = new URLSearchParams({ scope: plan.scope });
+    if (plan.mode) params.set("mode", plan.mode);
     if (plan.minutes) params.set("minutes", String(plan.minutes));
     if (plan.scope === "range") {
       params.set("start", String(plan.start ?? 0));

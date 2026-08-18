@@ -2,7 +2,15 @@ import { useEffect, useMemo, useState } from "react";
 import { api, ApiError } from "../api";
 import { spell } from "../format";
 import { languageOptions } from "../languages";
-import type { Entry, Estimate, Meta, ReadingRequest, Scope, SegmentList } from "../types";
+import type {
+  Entry,
+  Estimate,
+  Meta,
+  ReadingMode,
+  ReadingRequest,
+  Scope,
+  SegmentList,
+} from "../types";
 import { RangePicker } from "./RangePicker";
 import { VoicePreview } from "./VoicePreview";
 
@@ -20,9 +28,26 @@ const MODES: { id: Scope; label: string; blurb: string }[] = [
   { id: "full", label: "Everything", blurb: "The document end to end." },
 ];
 
+const STYLES: { id: ReadingMode; label: string; blurb: string }[] = [
+  {
+    id: "sentence",
+    label: "Default",
+    blurb: "One sentence at a time. Every subtitle line is one sentence.",
+  },
+  {
+    id: "paragraph",
+    label: "Refined",
+    blurb:
+      "Reads a few sentences in one breath, so a paragraph runs on the way a " +
+      "person would read it. The voice places those pauses itself, and one " +
+      "subtitle line covers the whole group. Experimental.",
+  },
+];
+
 export function GeneratePanel({ entry, meta, onStart, onCancel, starting }: Props) {
   // A taster first: it is the cheap answer to "is this voice right?"
   const [mode, setMode] = useState<Scope>("sample");
+  const [style, setStyle] = useState<ReadingMode>("sentence");
   const [minutes, setMinutes] = useState(meta.sample_minutes);
   const [voice, setVoice] = useState(entry.voice);
   const [lang, setLang] = useState(entry.lang);
@@ -54,13 +79,13 @@ export function GeneratePanel({ entry, meta, onStart, onCancel, starting }: Prop
   }, [mode, list, entry.id, speed]);
 
   const plan = useMemo<ReadingRequest>(() => {
-    const base = { voice, lang, speed };
+    const base = { voice, lang, speed, mode: style };
     if (mode === "sample") return { ...base, scope: "sample", minutes };
     if (mode === "range" && range) {
       return { ...base, scope: "range", start: range[0], end: range[1] };
     }
     return { ...base, scope: mode };
-  }, [mode, minutes, range, voice, lang, speed]);
+  }, [mode, minutes, range, voice, lang, speed, style]);
 
   useEffect(() => {
     if (mode === "range" && !range) return;
@@ -141,6 +166,28 @@ export function GeneratePanel({ entry, meta, onStart, onCancel, starting }: Prop
           )}
         </div>
       ) : null}
+
+      <div className="gen__block">
+        <span className="label">Style</span>
+        <div className="segmented" role="radiogroup" aria-label="Reading style">
+          {STYLES.map((choice) => (
+            <button
+              key={choice.id}
+              type="button"
+              role="radio"
+              aria-checked={style === choice.id}
+              className="segmented__option"
+              onClick={() => setStyle(choice.id)}
+            >
+              {choice.label}
+              {choice.id === "paragraph" ? " (experimental)" : ""}
+            </button>
+          ))}
+        </div>
+        <p className="hint">
+          {STYLES.find((choice) => choice.id === style)?.blurb}
+        </p>
+      </div>
 
       <div className="gen__block gen__voice">
         <div>

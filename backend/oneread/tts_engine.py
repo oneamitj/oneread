@@ -18,7 +18,17 @@ import numpy as np
 import soundfile as sf
 
 from .config import Settings, get_settings
-from .segmenter import BLOCK, LINE, SENTENCE, max_chars_for, segment_spans
+from .segmenter import (
+    BLOCK,
+    BY_PARAGRAPH,
+    BY_SENTENCE,
+    CHUNK_MAX_CHARS,
+    LINE,
+    SENTENCE,
+    group_spans,
+    max_chars_for,
+    segment_spans,
+)
 
 log = logging.getLogger("oneread.tts")
 
@@ -191,6 +201,7 @@ class TTSEngine:
         limit_s: float | None = None,
         start_segment: int = 0,
         end_segment: int | None = None,
+        mode: str = BY_SENTENCE,
         on_progress: ProgressHook | None = None,
         should_stop: StopHook | None = None,
     ) -> Synthesis:
@@ -207,6 +218,12 @@ class TTSEngine:
         `limit_s` stops once that many seconds exist. `start_segment` and
         `end_segment` read a slice instead, counted in sentences so a range
         begins and ends on a whole one.
+
+        `mode` "paragraph" hands the model several whole sentences per call, so
+        it places the pauses between them itself. One cue then covers the whole
+        chunk. Everything reported stays counted in sentences either way, so a
+        range, the progress bar and the coverage of two readings mean the same
+        thing whichever mode made them.
         """
         text = self.speakable(text.strip())
         if not text:
@@ -236,14 +253,24 @@ class TTSEngine:
 
         every_segment = segment_spans(text, lang=lang)
         start_segment = max(0, min(start_segment, len(every_segment)))
-        segments = every_segment[start_segment:end_segment]
-        if not segments:
+        sentences = every_segment[start_segment:end_segment]
+        if not sentences:
             raise SynthesisError("That range doesn't cover any text.")
-        limit = max_chars_for(lang)
+
+        # Grouping happens after the slice, so a range still begins and ends on
+        # the sentences the reader picked.
+        if mode == BY_PARAGRAPH:
+            segments = group_spans(sentences, target=self.settings.paragraph_chunk_chars)
+            limit = CHUNK_MAX_CHARS
+        else:
+            segments = sentences
+            limit = max_chars_for(lang)
+        total = len(sentences)
 
         cues: list[dict] = []
         cursor = 0  # samples written so far
         spoken_chars = 0
+        sentence = start_segment  # where the next piece starts, in sentences
         done = 0
         complete = True
         reason = "complete"
@@ -287,7 +314,7 @@ class TTSEngine:
                     end = cursor / tts.sample_rate
                     cues.append(
                         {
-                            "i": start_segment + index,
+                            "i": sentence,
                             "start": round(start, 3),
                             "end": round(end, 3),
                             "text": segment,
@@ -295,13 +322,14 @@ class TTSEngine:
                     )
                     sink.write(clip)
                     spoken_chars += len(segment)
-                    done = index + 1
+                    sentence += span.parts
+                    done = sentence - start_segment
 
                     if limit_s is not None and end >= limit_s:
-                        complete = done >= len(segments)
+                        complete = done >= total
                         reason = "complete" if complete else "limit"
                         if on_progress is not None:
-                            on_progress(done, len(segments), end)
+                            on_progress(done, total, end)
                         break
 
                     if index < len(segments) - 1:
@@ -313,7 +341,7 @@ class TTSEngine:
                             cursor += pause.size
 
                     if on_progress is not None:
-                        on_progress(done, len(segments), end)
+                        on_progress(done, total, end)
         except BaseException:
             tmp_path.unlink(missing_ok=True)
             raise
@@ -324,12 +352,12 @@ class TTSEngine:
 
         tmp_path.replace(out_path)
 
-        covers_everything = start_segment == 0 and len(segments) == len(every_segment)
+        covers_everything = start_segment == 0 and total == len(every_segment)
         return Synthesis(
             duration_s=round(cursor / tts.sample_rate, 3),
             cues=cues,
             segments_done=done,
-            segments_total=len(segments),
+            segments_total=total,
             spoken_chars=spoken_chars,
             document_segments=len(every_segment),
             opening=cues[0]["text"][:160] if cues else "",

@@ -34,7 +34,7 @@ from ..schemas import (
     SourceFile,
 )
 from ..security import content_disposition
-from ..segmenter import segment_spans
+from ..segmenter import BY_SENTENCE, READING_MODES, segment_spans
 from ..subtitles import slugify
 from ..worker import Worker, calibration_for, get_worker
 from .uploads import claim, forget
@@ -339,6 +339,7 @@ def _queue_reading(
     entry: Entry,
     *,
     scope: str,
+    mode: str = BY_SENTENCE,
     minutes: int | None = None,
     start: int = 0,
     end: int | None = None,
@@ -364,6 +365,7 @@ def _queue_reading(
         entry_id=entry.id,
         user_id=entry.user_id,
         scope=scope,
+        mode=mode,
         limit_s=limit_s,
         start_segment=start,
         end_segment=end,
@@ -629,6 +631,7 @@ def estimate_entry(
     settings: Annotated[Settings, Depends(get_settings)],
     limiter: Annotated[RateLimiter, Depends(text_limiter)],
     scope: str = "full",
+    mode: str = BY_SENTENCE,
     minutes: int | None = None,
     start: int = 0,
     end: int | None = None,
@@ -636,9 +639,14 @@ def estimate_entry(
 ) -> EstimateOut:
     """How long the audio will be, and how long the machine will take."""
     enforce(limiter, user.id, TOO_MUCH_TEXT_WORK)
+    if mode not in READING_MODES:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            f"Pick one of {', '.join(READING_MODES)}.",
+        )
     entry = _owned(session, entry_id, user.id)
     spoken = _spoken_of(entry)
-    rates = calibration_for(session, user.id, entry_id)
+    rates = calibration_for(session, user.id, entry_id, mode=mode)
     wanted = speed if speed is not None else entry.speed
     if scope == "range":
         # Estimated from the pieces themselves: rejoining them into text would
@@ -649,10 +657,21 @@ def estimate_entry(
                 status.HTTP_422_UNPROCESSABLE_CONTENT,
                 "That range doesn't cover any text.",
             )
-        guess = estimate_spans(pieces, speed=wanted, calibration=rates)
+        guess = estimate_spans(
+            pieces,
+            speed=wanted,
+            calibration=rates,
+            mode=mode,
+            chunk_chars=settings.paragraph_chunk_chars,
+        )
     else:
         guess = estimate_cost(
-            spoken, lang=entry.lang, speed=wanted, calibration=rates
+            spoken,
+            lang=entry.lang,
+            speed=wanted,
+            calibration=rates,
+            mode=mode,
+            chunk_chars=settings.paragraph_chunk_chars,
         )
     if scope == "sample":
         guess = guess.capped((minutes or settings.sample_minutes) * 60)
@@ -691,6 +710,7 @@ def start_reading(
         session,
         entry,
         scope=payload.scope,
+        mode=payload.mode,
         minutes=payload.minutes,
         start=payload.start,
         end=payload.end,

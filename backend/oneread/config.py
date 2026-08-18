@@ -16,6 +16,7 @@ from .pacing import (
     DEFAULT_LINE_GAP_S,
     DEFAULT_SENTENCE_GAP_S,
 )
+from .segmenter import CHUNK_MAX_CHARS, CHUNK_TARGET_CHARS
 
 #: A list setting written as a comma-separated string rather than JSON.
 #:
@@ -100,6 +101,11 @@ class Settings(BaseSettings):
     silence_between_lines_s: float = DEFAULT_LINE_GAP_S
     silence_between_blocks_s: float = DEFAULT_BLOCK_GAP_S
     trim_segment_silence: bool = True
+    #: How much text the experimental "refined" reading hands the model at once,
+    #: in characters (CJK counts triple). Whole sentences only, and never past
+    #: `CHUNK_MAX_CHARS`, where the duration predictor saturates and the speech
+    #: comes out rushed. See `segmenter.CHUNK_TARGET_CHARS`.
+    paragraph_chunk_chars: int = CHUNK_TARGET_CHARS
 
     # --- uploads ------------------------------------------------------------
     #: Refused outright above this. 25 MB is a long book as a PDF.
@@ -149,6 +155,17 @@ class Settings(BaseSettings):
     #: 404. Turn it on for an instance you actually want in search results and
     #: in the answers assistants give.
     public_site: bool = False
+
+    @field_validator("paragraph_chunk_chars")
+    @classmethod
+    def _within_the_models_reach(cls, value: int) -> int:
+        if not 40 <= value <= CHUNK_MAX_CHARS:
+            raise ValueError(
+                f"ONEREAD_PARAGRAPH_CHUNK_CHARS={value} is outside 40-{CHUNK_MAX_CHARS}. "
+                "Above that the model predicts one duration for more speech than "
+                "fits in it, and the reading is rushed."
+            )
+        return value
 
     @field_validator("log_level")
     @classmethod

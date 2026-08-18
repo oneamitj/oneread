@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from oneread.markdown_speech import to_speech
 from oneread.segmenter import (
+    BLOCK,
+    CHUNK_MAX_CHARS,
+    LINE,
     MAX_SEGMENT_CHARS,
+    group_spans,
     segment_spans,
     segment_text,
 )
@@ -143,3 +147,66 @@ def test_slugify():
     assert slugify("Chapter 1: My Notes!") == "chapter-1-my-notes"
     assert slugify("***") == "oneread"
     assert len(slugify("x" * 200)) <= 60
+
+
+# --- chunking for the refined reading ---------------------------------------
+
+
+def _chunks(text: str, **kwargs) -> list[tuple[str, str, int]]:
+    spans = group_spans(segment_spans(text), **kwargs)
+    return [(span.text, span.ends, span.parts) for span in spans]
+
+
+def test_sentences_gather_into_one_chunk():
+    text = "Warm the pan. Then add butter. Wait for it to foam."
+    assert _chunks(text) == [(text, BLOCK, 3)]
+
+
+def test_a_chunk_closes_at_the_end_of_a_paragraph():
+    text = "Warm the pan. Add butter.\n\nThen the eggs go in."
+    assert _chunks(text) == [
+        ("Warm the pan. Add butter.", BLOCK, 2),
+        ("Then the eggs go in.", BLOCK, 1),
+    ]
+
+
+def test_a_chunk_closes_at_the_end_of_a_line():
+    text = "Eggs, two of them.\nButter, a knob.\n\nBeat them together."
+    assert _chunks(text) == [
+        ("Eggs, two of them.", LINE, 1),
+        ("Butter, a knob.", BLOCK, 1),
+        ("Beat them together.", BLOCK, 1),
+    ]
+
+
+def test_a_chunk_closes_at_a_sentence_end_once_it_has_had_enough():
+    # Six sentences of 58 characters each, one paragraph. Two of them pass the
+    # target, and a third would pass the maximum, so each chunk holds two.
+    sentence = "The harbour was quiet that morning and the boats lay still. "
+    chunks = _chunks((sentence * 6).strip(), target=120, hard_max=130)
+    assert [parts for _, _, parts in chunks] == [2, 2, 2]
+    assert all(len(text) <= 130 for text, _, _ in chunks)
+
+
+def test_a_sentence_that_straddles_the_target_is_taken_whole():
+    """The target is where to stop looking, the maximum is the wall."""
+    sentence = "The harbour was quiet that morning and the boats lay still. "
+    chunks = _chunks((sentence * 3).strip(), target=120, hard_max=200)
+    assert [parts for _, _, parts in chunks] == [3]
+    assert len(chunks[0][0]) == 179  # past the target, under the maximum
+
+
+def test_a_chunk_never_goes_past_the_maximum():
+    sentence = "The harbour was quiet that morning and the boats lay still. "
+    for chunk, _, _ in _chunks((sentence * 40).strip()):
+        assert len(chunk) <= CHUNK_MAX_CHARS
+
+
+def test_the_sentences_survive_chunking_whole():
+    text = "Warm the pan. Add butter.\n\nThen the eggs.\n\nSalt at the end."
+    sentences = segment_spans(text)
+    chunks = group_spans(sentences)
+    assert sum(chunk.parts for chunk in chunks) == len(sentences)
+    assert " ".join(chunk.text for chunk in chunks) == " ".join(
+        span.text for span in sentences
+    )

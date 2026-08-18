@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from .auth import MIN_PASSWORD_LEN, USERNAME_RE
 from .markdown_speech import DEFAULT_FORMAT, FORMATS
 from .models import SCOPES
+from .segmenter import BY_SENTENCE, READING_MODES
 from .tts_engine import MAX_SPEED, MIN_SPEED, VOICE_IDS
 
 MAX_TAGS = 12
@@ -152,6 +153,7 @@ class RenditionOut(BaseModel):
     id: str
     entry_id: str
     scope: str
+    mode: str
     limit_s: int | None
     status: str
     stop_requested: bool
@@ -207,6 +209,8 @@ class VoiceChoice(BaseModel):
 
 class RenditionIn(VoiceChoice):
     scope: str = "full"
+    #: "sentence" or the experimental "paragraph". See `segmenter`.
+    mode: str = BY_SENTENCE
     minutes: int | None = None
     #: Half-open span of sentences, for scope "range".
     start: int = 0
@@ -217,6 +221,13 @@ class RenditionIn(VoiceChoice):
     def _scope(cls, value: str) -> str:
         if value not in SCOPES:
             raise ValueError(f"Pick one of {', '.join(SCOPES)}.")
+        return value
+
+    @field_validator("mode")
+    @classmethod
+    def _mode(cls, value: str) -> str:
+        if value not in READING_MODES:
+            raise ValueError(f"Pick one of {', '.join(READING_MODES)}.")
         return value
 
     @field_validator("minutes")

@@ -9,6 +9,14 @@ export type RenditionStatus =
 
 export type Scope = "sample" | "range" | "full";
 
+/**
+ * How the text is cut up before it reaches the voice. "sentence" is one
+ * sentence per go, and one subtitle line per sentence. "paragraph" hands the
+ * voice several sentences at once so it runs them together the way a reader
+ * would; a subtitle line then covers the whole group.
+ */
+export type ReadingMode = "sentence" | "paragraph";
+
 export interface Cue {
   i: number;
   start: number;
@@ -21,6 +29,7 @@ export interface Rendition {
   id: string;
   entry_id: string;
   scope: Scope;
+  mode: ReadingMode;
   limit_s: number | null;
   status: RenditionStatus;
   stop_requested: boolean;
@@ -145,6 +154,7 @@ export interface SegmentList {
 
 export interface ReadingRequest {
   scope: Scope;
+  mode?: ReadingMode;
   minutes?: number | null;
   start?: number;
   end?: number | null;

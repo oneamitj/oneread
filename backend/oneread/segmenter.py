@@ -45,12 +45,38 @@ LINE = "line"
 BLOCK = "block"
 
 
+# How a reading is cut up before it reaches the model.
+#
+# "sentence" is the original: one sentence per synthesis call, one subtitle cue
+# per sentence. "paragraph" hands the model several whole sentences at once so
+# it places the pauses between them itself and the intonation carries across
+# the boundary; a cue then covers the whole chunk.
+BY_SENTENCE = "sentence"
+BY_PARAGRAPH = "paragraph"
+READING_MODES = (BY_SENTENCE, BY_PARAGRAPH)
+
+# What one chunk may hold, measured in `_weight` rather than characters so CJK
+# counts for what it costs. Aim for the target and stop at the last sentence
+# that fits; never go past the maximum.
+#
+# The maximum is not a preference. Supertonic predicts one duration for the
+# whole call, and that prediction saturates: measured on supertonic-3, 300
+# characters gives 18.9 s, 400 gives 24.7 s, 500 gives 27.6 s and everything
+# from 600 up gives ~28.5 s no matter how much text follows. Past ~450 the
+# speech is crushed into a canvas too small for it and comes out rushed. 400
+# keeps a margin under that wall.
+CHUNK_TARGET_CHARS = 350
+CHUNK_MAX_CHARS = 400
+
+
 @dataclass(frozen=True)
 class Segment:
     """One piece to speak, and what kind of break comes after it."""
 
     text: str
     ends: str = SENTENCE
+    #: Sentences inside this piece. More than one only after `group_spans`.
+    parts: int = 1
 
     @property
     def ends_block(self) -> bool:
@@ -141,6 +167,47 @@ def segment_spans(text: str, lang: str | None = None) -> list[Segment]:
     if segments:
         return segments
     return [Segment(text.strip(), BLOCK)] if text.strip() else []
+
+
+def group_spans(
+    spans: list[Segment],
+    *,
+    target: int = CHUNK_TARGET_CHARS,
+    hard_max: int = CHUNK_MAX_CHARS,
+) -> list[Segment]:
+    """Gather whole sentences into chunks the model can read in one breath.
+
+    A chunk grows until it reaches `target`, then closes at that sentence end —
+    so a chunk never cuts mid-sentence, and never exceeds `hard_max`. A line or
+    a paragraph break closes a chunk wherever it falls, because the pause there
+    is ours to place, not the model's.
+    """
+    out: list[Segment] = []
+    buffer: Segment | None = None
+    weight = 0
+
+    for span in spans:
+        span_weight = _weight(span.text)
+        if buffer is not None and (
+            buffer.ends != SENTENCE  # a line or a block ended: so does the chunk
+            or weight >= target
+            or weight + span_weight + 1 > hard_max
+        ):
+            out.append(buffer)
+            buffer = None
+
+        if buffer is None:
+            buffer, weight = span, span_weight
+            continue
+
+        buffer = Segment(
+            _join(buffer.text, span.text), span.ends, buffer.parts + span.parts
+        )
+        weight += span_weight + 1
+
+    if buffer is not None:
+        out.append(buffer)
+    return out
 
 
 def _lines_of(block: str) -> list[str]:

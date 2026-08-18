@@ -55,6 +55,11 @@ export function ReadingCard({ entryTitle, reading, onStop, onDelete }: Props) {
           <p className="reading__sub">{live ? "Just started" : subtitle(reading)}</p>
         </div>
         <div className="reading__marks">
+          {reading.mode === "paragraph" ? (
+            <span className="pill" title="Read a few sentences at a time">
+              Refined
+            </span>
+          ) : null}
           {reading.is_default ? <span className="pill">Plays by default</span> : null}
           {reading.complete ? (
             <span className="tick" title="Covers the whole text">✓</span>

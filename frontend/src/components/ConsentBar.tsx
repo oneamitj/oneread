@@ -1,8 +1,9 @@
 import { setConsent, useConsent } from "../analytics/consent";
 
 /**
- * The one thing the app asks for its own benefit, so: plain words about what is
- * collected, both answers as equal buttons, and no second asking.
+ * Shown only where somebody has to be asked — see `analytics/region.ts`. So:
+ * plain words about what Clarity collects, both answers as equal buttons, and
+ * no second asking.
  */
 export function ConsentBar() {
   const choice = useConsent();
@@ -11,8 +12,10 @@ export function ConsentBar() {
   return (
     <div className="consent glass glass--thin" role="region" aria-label="Analytics">
       <p className="consent__copy">
-        Oneread can track how the app gets used, through Microsoft Clarity. Two cookies,
-        nothing recorded unless you say yes, off again from the account menu.
+        Oneread can record how the app gets used, through Microsoft Clarity. Two cookies,
+        nothing recorded unless you say yes, off again from the account menu. Either way
+        the server keeps a plain daily headcount, which sets no cookie and writes down
+        nobody — <a href="/about">what that is</a>.
       </p>
       <div className="consent__acts">
         <button type="button" className="btn" onClick={() => setConsent("denied")}>

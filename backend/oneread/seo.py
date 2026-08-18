@@ -117,9 +117,23 @@ FAQ: list[tuple[str, str]] = [
         "Does it send my documents anywhere?",
         "No. Synthesis happens in the same container as the app, using an ONNX "
         "model that ships inside the image, and there is no third-party speech "
-        "API in the path. The one piece of optional outbound traffic is Microsoft "
-        "Clarity analytics, which stays off until you turn it on and can be "
-        "revoked from the account menu.",
+        "API in the path. The one piece of outbound traffic is Microsoft Clarity "
+        "analytics, and no document text goes to it. In the places that require "
+        "an opt-in, chiefly the EU and the UK, Clarity stays off until you say "
+        "yes; elsewhere it starts on its own. Either way one click in the account "
+        "menu turns it off, which stops the recorder and clears its cookies.",
+    ),
+    (
+        "What does oneread count about me?",
+        "Four numbers a day, in aggregate: page views, unique visitors, signups "
+        "and sign-ins. That headcount runs for everyone and asks nobody, because "
+        "of what it refuses to keep. It sets no cookie and stores nothing in your "
+        "browser. Your address and browser name are never written down: they are "
+        "hashed under a random key made in memory that is destroyed at midnight, "
+        "so two days cannot be linked, by an attacker with the database or by the "
+        "person running the server. There is no row about any one visitor "
+        "anywhere. Microsoft Clarity, which does record sessions, is the separate "
+        "thing you can say no to.",
     ),
     (
         "What does it cost?",

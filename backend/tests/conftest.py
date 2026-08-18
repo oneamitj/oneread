@@ -13,6 +13,7 @@ from oneread.config import Settings, get_settings, set_settings
 from oneread.main import create_app
 from oneread.segmenter import segment_text
 from oneread.tts_engine import Synthesis, TTSEngine, set_engine
+from oneread.visits import VisitCounter, set_counter
 from oneread.worker import Worker, set_worker
 
 SAMPLE_RATE = 44100
@@ -182,6 +183,12 @@ def client(settings: Settings, engine: FakeEngine):
     worker = Worker(engine=engine)
     set_worker(worker)
 
+    # The counter is a process-wide singleton like the worker, so without this
+    # the sign-ins one test performs turn up in the next one's numbers. An hour
+    # between flushes means the thread lifespan starts never ticks; teardown's
+    # `stop()` does the one write, which is the behaviour worth exercising.
+    set_counter(VisitCounter(flush_interval_s=3600.0))
+
     app = create_app(settings)
     app.dependency_overrides[get_settings] = lambda: settings
 
@@ -202,6 +209,7 @@ def client(settings: Settings, engine: FakeEngine):
         yield test_client
 
     set_worker(None)
+    set_counter(None)
     sql_engine.dispose()
 
 

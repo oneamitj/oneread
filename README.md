@@ -37,8 +37,13 @@ per-character billing. The model is ~385 MB and is baked into the Docker image.
   are per-user. The session cookie lasts a month and renews on use. Its signing
   key is generated once into `data/secret.key` (mode 0600) so restarts don't sign
   everybody out; `ONEREAD_SECRET_KEY` overrides it.
-- **Analytics.** Microsoft Clarity, off until asked for, revocable from the
-  account menu.
+- **Usage.** A cookieless headcount kept by the server: page views, unique
+  visitors, signups and sign-ins, four integers per UTC day. It stores nothing in
+  the browser and no address ever reaches the disk, so it asks nobody. `make
+  stats` prints it.
+- **Analytics.** Microsoft Clarity, on by default only where no opt-in is
+  required — in the EU, the UK and their neighbours it stays off until asked for.
+  Revocable from the account menu everywhere.
 
 Audio is streamed to disk a sentence at a time, so a two-hour entry costs no more
 memory than a two-minute one. Measured on an M-series laptop: 3,120 characters →
@@ -68,8 +73,9 @@ make install
 make dev-backend     # API on :8000
 make dev-frontend    # Vite on :5173, proxying /api
 make serve           # build the frontend, serve everything from :8000
-make test            # 184 tests, no model needed
+make test            # 214 tests, no model needed
 make lint
+make stats           # page views and visitors per day (DAYS=90 for a quarter)
 ```
 
 Tests swap in a fake engine that writes silent wavs, so they take about a second.
@@ -201,6 +207,8 @@ Every setting is an environment variable prefixed `ONEREAD_`, or a line in
 | `ONEREAD_PUBLIC_URL` | empty | This instance's address, for canonical links and the sitemap. |
 | `ONEREAD_TTS_STEPS` | `8` | More steps, slightly better audio, more CPU. |
 | `ONEREAD_PRELOAD_MODEL` | `true` | Load ONNX at startup. |
+| `ONEREAD_COUNT_VISITS` | `true` | The cookieless daily headcount behind `make stats`. |
+| `ONEREAD_VISITS_FLUSH_INTERVAL_S` | `60` | How much of it a crash can cost. |
 
 ## Layout
 
@@ -209,7 +217,7 @@ backend/oneread/
   main.py             app factory, lifespan, serves the built frontend
   config.py           settings
   db.py               SQLite engine, FTS5 table and its triggers
-  models.py           User, Entry, Rendition, Upload
+  models.py           User, Entry, Rendition, Upload, DailyCount
   estimates.py        reading length, calibrated from finished ones
   auth.py             argon2, signed cookies, the CSRF check
   markdown_speech.py  markdown flattened into words a voice can say
@@ -218,9 +226,12 @@ backend/oneread/
   tts_engine.py       Supertonic held open, per-segment synthesis, cue timings
   subtitles.py        cues into SRT and WebVTT
   worker.py           the job queue and its one thread
+  visits.py           the cookieless headcount, and the salt it throws away
+  stats.py            that headcount as a table, behind `make stats`
   seo.py              the copy /about and llms.txt are both built from
   routers/            auth, entries, renditions, meta, preview, uploads, site
 frontend/src/
+  analytics/          Clarity, the consent it needs, and where it needs it
   screens/            AuthGate, Library, EntryPage
   components/         cards, players, editor, pickers
   styles/             tokens.css, glass.css, app.css

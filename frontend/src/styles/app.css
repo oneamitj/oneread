@@ -1464,6 +1464,17 @@
   text-wrap: pretty;
 }
 
+/* The one link here explains the thing nobody is being asked about, so it reads
+   as part of the sentence rather than as a third answer competing with the two
+   buttons. Underline only, no colour of its own. */
+.consent__copy a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+}
+.consent__copy a:hover { text-decoration-thickness: 2px; }
+
 /* Both answers the same size. A greyed-out "no" next to a bright "allow" is a
    nudge, and a nudged consent isn't one. */
 .consent__acts { display: flex; gap: var(--s-2); flex: none; }

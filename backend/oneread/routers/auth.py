@@ -24,6 +24,7 @@ from ..db import get_session
 from ..models import User
 from ..ratelimit import RateLimiter, client_ip, enforce, peer_ip
 from ..schemas import Credentials, SessionOut, UserOut
+from ..visits import get_counter
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -129,6 +130,10 @@ def login(
             session.commit()
 
     issue_session(response, user, settings)
+    # Only successful attempts reach this far; every refusal has already raised.
+    if settings.count_visits:
+        counter = get_counter()
+        counter.record_signup() if created else counter.record_signin()
     return SessionOut(user=UserOut.model_validate(user), created=created)
 
 

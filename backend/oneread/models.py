@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from sqlalchemy import (
     JSON,
     Boolean,
+    Date,
     DateTime,
     Float,
     ForeignKey,
@@ -212,6 +213,35 @@ class Upload(Base):
 
     entry_id: Mapped[str | None] = mapped_column(String(32), default=None)
     created_at: Mapped[datetime] = mapped_column(UtcDateTime, default=utcnow)
+
+
+class DailyCount(Base):
+    """One row per UTC day: how many people used the site, and nothing else.
+
+    Every column here is a date or an integer. The table could be published as
+    it stands and it would still say nothing about any one reader — there is no
+    per-visit row, no per-visitor row, and no address or user agent anywhere in
+    the schema. See `visits.py` for how the numbers are arrived at.
+
+    `visitors` is unique *per day* and deliberately does not add up across days.
+    The salt it was counted under is destroyed at midnight, so the same person
+    on Tuesday and Wednesday is two visitors and there is no way to find out
+    otherwise.
+    """
+
+    __tablename__ = "daily_counts"
+
+    #: The primary key, so the one index there is already serves
+    #: `ORDER BY day DESC LIMIT n`. A year is 365 rows.
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+
+    views: Mapped[int] = mapped_column(Integer, default=0)
+    visitors: Mapped[int] = mapped_column(Integer, default=0)
+    signups: Mapped[int] = mapped_column(Integer, default=0)
+    signins: Mapped[int] = mapped_column(Integer, default=0)
+    updated_at: Mapped[datetime] = mapped_column(
+        UtcDateTime, default=utcnow, onupdate=utcnow
+    )
 
 
 def pick_default(renditions: list[Rendition]) -> Rendition | None:

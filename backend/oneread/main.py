@@ -26,6 +26,7 @@ from .routers import renditions as rendition_router
 from .routers import site as site_router
 from .routers import uploads as upload_router
 from .security import BodyLimitMiddleware, SecurityHeadersMiddleware
+from .visits import get_counter, record_page_view
 from .worker import get_worker
 
 # ONEREAD_LOG_LEVEL, INFO here and ERROR in production, where the request log
@@ -45,6 +46,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     worker = get_worker()
     worker.start()
     worker.requeue_unfinished()
+
+    counter = get_counter()
+    if settings.count_visits:
+        counter.start()
 
     # A file read but never turned into an entry is nobody's, and a crash
     # mid-edit leaves one behind. Clear the old ones on the way up.
@@ -67,6 +72,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     finally:
         log.info("draining synthesis queue")
         worker.stop(timeout=60.0)
+        # After the worker, so the drain is inside the window this writes out.
+        counter.stop()
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -146,10 +153,17 @@ def _mount_frontend(app: FastAPI, settings: Settings) -> None:
     shell = _shell(index, settings)
 
     @app.get("/{path:path}", include_in_schema=False)
-    async def spa(path: str) -> Response:
+    async def spa(path: str, request: Request) -> Response:
         candidate = (static_dir / path).resolve()
         if path and static_dir.resolve() in candidate.parents and candidate.is_file():
             return FileResponse(candidate)
+        # Everything with a route of its own — the API, /about, robots.txt,
+        # /healthz, /assets — was matched before this, and the branch above
+        # takes the remaining files. So reaching here is already "somebody
+        # loaded a page", and the counter needs no allowlist of its own to keep
+        # in step with the routers.
+        if settings.count_visits:
+            record_page_view(request, path)
         return HTMLResponse(shell, headers={"Cache-Control": "no-cache"})
 
 

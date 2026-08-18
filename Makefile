@@ -24,6 +24,12 @@ lint: ## Ruff over the backend, tsc over the frontend
 build: ## Build the frontend into frontend/dist
 	cd frontend && npm run build
 
+#: How many days the usage table shows. `make stats DAYS=90` for a quarter.
+DAYS ?= 30
+
+stats: ## Page views, visitors, signups and sign-ins per day (DAYS=30)
+	$(PY) -m oneread.stats --days $(DAYS)
+
 # --no-proxy-headers: uvicorn's default lets a caller on this machine rewrite the
 # address its requests appear to come from, and rate limits are keyed on that.
 serve: build ## Build, then serve everything from :8000
@@ -54,6 +60,9 @@ prod-logs: ## Follow the logs
 
 prod-ps: ## What's running, and is it healthy
 	$(PROD) ps
+
+prod-stats: ## The usage table, read from inside the running container
+	$(PROD) exec -T app python -m oneread.stats --days $(DAYS)
 
 prod-restart: ## Restart the app without touching nginx or the certificate
 	$(PROD) restart app
@@ -87,6 +96,6 @@ src.backup(dst); dst.close(); src.close()"
 	$(PROD) exec -T app rm -rf /data/backup
 	@ls -lh backups | tail -1
 
-.PHONY: help install dev-backend dev-frontend test lint build serve docker-up docker-down \
-        prod-init prod-update prod-logs prod-ps prod-restart prod-down \
+.PHONY: help install dev-backend dev-frontend test lint build stats serve docker-up docker-down \
+        prod-init prod-update prod-logs prod-ps prod-stats prod-restart prod-down \
         prod-cert-renew prod-nginx-check prod-backup

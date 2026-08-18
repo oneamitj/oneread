@@ -60,6 +60,17 @@ class Settings(BaseSettings):
     # --- accounts -----------------------------------------------------------
     allow_registration: bool = True
 
+    # --- visits -------------------------------------------------------------
+    #: The cookieless headcount: page views, unique visitors, signups and
+    #: sign-ins, four integers per UTC day. Nothing is written to the browser
+    #: and no address reaches the disk, which is why it runs without asking.
+    #: See `visits.py`. Off means the table simply stays empty.
+    count_visits: bool = True
+    #: How long a crash can cost. The counts live in memory between flushes, so
+    #: this is the window, and one row a minute is nothing next to what the
+    #: synthesis worker already writes.
+    visits_flush_interval_s: float = 60.0
+
     # --- synthesis ----------------------------------------------------------
     max_text_chars: int = 100_000
     tts_steps: int = 8

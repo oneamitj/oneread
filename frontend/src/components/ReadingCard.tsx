@@ -1,7 +1,10 @@
-import { ago, localTime, spell } from "../format";
+import { useEffect, useState } from "react";
+import { downloadUrl, srtUrl, vttUrl } from "../api";
+import { ago, fileSize, localTime, spell } from "../format";
 import type { Rendition } from "../types";
 import { CoverageStrip } from "./CoverageStrip";
 import { GlassPlayer } from "./GlassPlayer";
+import { DownGlyph } from "./Glyphs";
 
 interface Props {
   entryTitle: string;
@@ -34,6 +37,15 @@ export function ReadingCard({ entryTitle, reading, onStop, onDelete }: Props) {
   const live = reading.status === "pending" || reading.status === "processing";
   const playable = reading.status === "ready" || reading.status === "stopped";
   const percent = Math.round(reading.progress * 100);
+  // Two presses, same as everywhere else that throws work away. Half an hour
+  // of reading is gone for good behind this button.
+  const [confirming, setConfirming] = useState(false);
+
+  useEffect(() => {
+    if (!confirming) return;
+    const timer = window.setTimeout(() => setConfirming(false), 4000);
+    return () => window.clearTimeout(timer);
+  }, [confirming]);
 
   return (
     <article className={`reading glass glass--thin is-${reading.status}`}>
@@ -102,6 +114,30 @@ export function ReadingCard({ entryTitle, reading, onStop, onDelete }: Props) {
         <p className={reading.status === "failed" ? "error-text" : "hint"}>{reading.error}</p>
       ) : null}
 
+      {/* The files this recording produced, on the recording itself. A pill
+          each: what it is, and pressing it hands you the file. */}
+      {playable ? (
+        <div className="reading__files">
+          <a className="filepill" href={downloadUrl(reading.id)} download>
+            <span className="filepill__name">Audio</span>
+            <span className="filepill__type">
+              WAV{fileSize(reading.duration_s) ? ` · ${fileSize(reading.duration_s)}` : ""}
+            </span>
+            <DownGlyph />
+          </a>
+          <a className="filepill" href={srtUrl(reading.id)} download>
+            <span className="filepill__name">Subtitles</span>
+            <span className="filepill__type">SRT</span>
+            <DownGlyph />
+          </a>
+          <a className="filepill" href={vttUrl(reading.id)} download>
+            <span className="filepill__name">Subtitles</span>
+            <span className="filepill__type">VTT</span>
+            <DownGlyph />
+          </a>
+        </div>
+      ) : null}
+
       {playable ? (
         <div className="reading__foot">
           <span className="hint" title={localTime(reading.created_at)}>
@@ -112,10 +148,13 @@ export function ReadingCard({ entryTitle, reading, onStop, onDelete }: Props) {
           {!reading.is_default ? (
             <button
               type="button"
-              className="btn btn--quiet btn--danger"
-              onClick={() => onDelete(reading)}
+              className={`btn btn--quiet btn--danger${confirming ? " is-armed" : ""}`}
+              onClick={() => {
+                if (confirming) onDelete(reading);
+                else setConfirming(true);
+              }}
             >
-              Remove
+              {confirming ? "Really remove?" : "Remove"}
             </button>
           ) : null}
         </div>

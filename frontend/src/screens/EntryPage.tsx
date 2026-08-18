@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "../api";
 import { EntryEditor } from "../components/EntryEditor";
 import { GeneratePanel } from "../components/GeneratePanel";
-import { DownloadCard } from "../components/DownloadCard";
 import { ReadingCard } from "../components/ReadingCard";
 import { TextPanels } from "../components/TextPanels";
 import { usePolling } from "../hooks/usePolling";
@@ -100,6 +99,12 @@ export function EntryPage({ entryId, meta, knownTags, onBack, onGone }: Props) {
     .filter((r) => r.status === "ready" || r.status === "stopped")
     .sort((a, b) => Number(b.complete) - Number(a.complete))[0];
 
+  // Newest first. A recording being made now is the one worth watching, and
+  // burying its progress bar under every older reading means scrolling to it.
+  const readings = [...entry.renditions].sort(
+    (a, b) => Date.parse(b.created_at) - Date.parse(a.created_at),
+  );
+
   return (
     <div className="page">
       <button type="button" className="btn btn--quiet page__back" onClick={onBack}>
@@ -185,25 +190,14 @@ export function EntryPage({ entryId, meta, knownTags, onBack, onGone }: Props) {
         </h2>
         {entry.renditions.length ? (
           <div className="readings">
-            {entry.renditions.map((reading) => (
-              <div
+            {readings.map((reading) => (
+              <ReadingCard
                 key={reading.id}
-                className={`pair${
-                  reading.status === "ready" || reading.status === "stopped"
-                    ? ""
-                    : " pair--alone"
-                }`}
-              >
-                <ReadingCard
-                  entryTitle={entry.title}
-                  reading={reading}
-                  onStop={(r: Rendition) => void run(() => api.stop(r.id))}
-                  onDelete={(r: Rendition) => void run(() => api.dropRendition(r.id))}
-                />
-                {reading.status === "ready" || reading.status === "stopped" ? (
-                  <DownloadCard reading={reading} />
-                ) : null}
-              </div>
+                entryTitle={entry.title}
+                reading={reading}
+                onStop={(r: Rendition) => void run(() => api.stop(r.id))}
+                onDelete={(r: Rendition) => void run(() => api.dropRendition(r.id))}
+              />
             ))}
           </div>
         ) : (

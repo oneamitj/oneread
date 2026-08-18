@@ -3,6 +3,7 @@ import { api, sourceUrl, spokenTextUrl } from "../api";
 import { sizeOf } from "../format";
 import type { Entry } from "../types";
 import { FileKind, kindOf } from "./FileKind";
+import { DownGlyph } from "./Glyphs";
 
 interface Props {
   entry: Entry;
@@ -122,20 +123,5 @@ export function TextPanels({ entry, onEdit }: Props) {
         {shown ?? (failed ? "Couldn't work that out." : "Working it out…")}
       </div>
     </>
-  );
-}
-
-function DownGlyph() {
-  return (
-    <svg className="filepill__down" width="12" height="12" viewBox="0 0 12 12" aria-hidden="true">
-      <path
-        d="M6 1.6v6.2M3.4 5.6 6 8.2l2.6-2.6M2.2 10.4h7.6"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
   );
 }

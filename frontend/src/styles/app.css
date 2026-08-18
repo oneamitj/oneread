@@ -799,20 +799,6 @@
   gap: var(--s-4);
 }
 
-/* The recording, and the files it produced, side by side and the same height. */
-.pair {
-  display: grid;
-  gap: var(--s-3);
-  grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
-  align-items: stretch;
-}
-
-.pair--alone { grid-template-columns: 1fr; }
-
-@media (max-width: 62rem) {
-  .pair { grid-template-columns: 1fr; }
-}
-
 .reading {
   padding: var(--s-4);
   border-radius: var(--r-md);
@@ -869,84 +855,14 @@
   justify-content: space-between;
   gap: var(--s-3);
   flex-wrap: wrap;
-  /* Pinned to the bottom, so a short card still lines up with its files. */
   margin-top: auto;
 }
 
-/* --- the files, in the open -------------------------------------------- */
-
-.files {
-  padding: var(--s-3);
-  border-radius: var(--r-md);
+/* What this recording produced, as pills along the bottom of its own card. */
+.reading__files {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.files__list {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-evenly;
-  gap: 2px;
-  flex: 1;
-}
-
-.files__head {
-  margin: 0 0 var(--s-1);
-  padding-inline: var(--s-2);
-  font-size: 0.6875rem;
-  font-weight: 650;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-}
-
-.files a {
-  display: flex;
-  align-items: center;
-  gap: var(--s-3);
-  padding: var(--s-2);
-  border-radius: var(--r-sm);
-  color: inherit;
-  text-decoration: none;
-  transition: background var(--t-fast) var(--ease-out),
-    transform var(--t-fast) var(--ease-out);
-}
-
-.files a:hover { background: var(--accent-tint); }
-.files a:active { transform: scale(0.985); }
-
-.files__icon {
-  flex: none;
-  width: 2rem;
-  height: 2rem;
-  display: grid;
-  place-items: center;
-  border-radius: var(--r-sm);
-  background: var(--accent-tint);
-  color: var(--accent);
-}
-
-.files__body { display: flex; flex-direction: column; min-width: 0; flex: 1; }
-.files__body strong { font-size: 0.9375rem; font-weight: 600; }
-
-.files__body span {
-  font-size: 0.8125rem;
-  color: var(--ink-3);
-  line-height: 1.35;
-}
-
-.files__ext {
-  flex: none;
-  align-self: flex-start;
-  margin-top: 0.15rem;
-  font-family: var(--font-mono);
-  font-size: 0.6875rem;
-  letter-spacing: 0.06em;
-  color: var(--ink-3);
-  padding: 0.1rem 0.4rem;
-  border-radius: var(--r-sm);
-  border: 1px solid var(--hairline);
+  flex-wrap: wrap;
+  gap: var(--s-2);
 }
 
 /* --- the two views of the text ------------------------------------------ */

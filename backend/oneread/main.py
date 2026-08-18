@@ -134,8 +134,36 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # /robots.txt and the rest and answer them with the React shell.
     app.include_router(site_router.router)
 
+    # After every router and before the frontend, so it catches what no route
+    # claimed and nothing else ever sees an /api/ path.
+    _seal_api(app)
     _mount_frontend(app, settings)
     return app
+
+
+def _seal_api(app: FastAPI) -> None:
+    """Answer any unclaimed /api/ path in JSON, whatever the method.
+
+    Two things would otherwise handle these, and both lie. The frontend's
+    catch-all below returns the React shell with a 200, so a caller expecting
+    `{"message": "..."}` parses HTML and reports whatever its most generic
+    sentence is — which is how a proxy sending `POST /api/uploads` to
+    `/api/uploads/` looked for a while like a file that couldn't be read. And
+    starlette's `redirect_slashes` answers the other direction with a 307,
+    quietly making the slash optional on routes where it isn't.
+
+    Registered for every method rather than GET alone, so neither of those can
+    reach an /api/ path by any route. It costs the 405s, which said more about
+    the routing table than a stranger needed anyway.
+    """
+
+    @app.api_route(
+        "/api/{rest:path}",
+        methods=["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"],
+        include_in_schema=False,
+    )
+    async def unknown_endpoint(rest: str) -> Response:
+        raise HTTPException(404, "No such endpoint.")
 
 
 def _mount_frontend(app: FastAPI, settings: Settings) -> None:

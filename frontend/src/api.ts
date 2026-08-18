@@ -29,8 +29,14 @@ const FALLBACK: Record<number, string> = {
   403: "That request was blocked. Reload the page and try again.",
   404: "That entry is gone.",
   409: "The audio isn't ready yet.",
+  413: "That file is bigger than the limit.",
+  422: "That file couldn't be read.",
   429: "Too many requests. Give it a minute.",
   500: "The server had a problem. Try again in a moment.",
+  // nginx answers these itself while the app is down or restarting, with its
+  // own HTML page rather than the `{"message": "..."}` every route produces.
+  502: "The server is restarting. Try again in a moment.",
+  503: "The server is restarting. Try again in a moment.",
 };
 
 function send(path: string, init: RequestInit = {}): Promise<Response> {
@@ -65,7 +71,16 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await send(path, init);
   if (!response.ok) throw await failure(response);
   if (response.status === 204) return undefined as T;
-  return (await response.json()) as T;
+  try {
+    return (await response.json()) as T;
+  } catch {
+    // A 2xx that isn't JSON means something between here and the route
+    // answered instead of the route: a proxy redirect followed into the HTML
+    // shell, a captive portal, a cached page. Raising the parse error as-is
+    // hands the caller a `SyntaxError` it can't tell apart from a bug of its
+    // own, and every caller then shows its most generic sentence.
+    throw new ApiError(response.status, "The server sent an answer we couldn't read.");
+  }
 }
 
 export const api = {

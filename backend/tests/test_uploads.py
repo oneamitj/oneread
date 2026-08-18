@@ -386,6 +386,21 @@ def test_signed_out_visitors_cannot_upload(client):
     assert upload(client, "notes.txt", b"Hello.").status_code == 401
 
 
+def test_an_api_path_with_no_route_answers_in_json_not_html(client):
+    """The upload route is `/api/uploads`; the slashed form is nobody's route.
+
+    A proxy that redirects one to the other turns a POST into a GET, and if the
+    catch-all then hands back the React shell with a 200 the frontend parses
+    HTML as JSON and reports whatever its most generic sentence is. That is how
+    a routing mistake spent a while looking like a broken file.
+    """
+    for path in ("/api/uploads/", "/api/nothing-here"):
+        response = client.get(path)
+        assert response.status_code == 404, path
+        assert response.headers["content-type"].startswith("application/json"), path
+        assert response.json()["message"]
+
+
 def test_the_meta_route_lists_what_can_be_uploaded(client):
     body = client.get("/api/meta").json()
     extensions = {item["ext"] for item in body["upload_types"]}

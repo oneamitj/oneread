@@ -116,11 +116,24 @@ server {
         proxy_pass http://oneread_app;
     }
 
+    # The three prefixes below end without a slash, and that is load-bearing
+    # rather than a style choice. A prefix location that ends in `/` and proxies
+    # gets special treatment from nginx: a request for the prefix *without* the
+    # slash is answered by nginx's own 301 to the slashed form, and never
+    # reaches the app. A browser following that 301 turns a POST into a GET and
+    # drops the body, so `POST /api/uploads` arrived as `GET /api/uploads/`, was
+    # answered with the React shell, and every upload failed in production while
+    # working locally — where there is no nginx in the way. So a prefix that is
+    # itself a route is written without the slash. Don't put them back.
+    #
+    # `/api/` below keeps its slash because bare `/api` is nobody's route: the
+    # redirect can happen there and there is nothing for it to break.
+    #
     # Sign-in. The app already counts attempts three ways — per claimed address,
     # per real peer, and per user id — so this is only here to keep a password
     # flood off the single worker in the first place. `nodelay` lets a burst of
     # honest retries through immediately and only then starts refusing.
-    location ^~ /api/auth/ {
+    location ^~ /api/auth {
         limit_req  zone=auth burst=10 nodelay;
         limit_conn conn 16;
         include /etc/nginx/proxy_common.conf;
@@ -132,7 +145,7 @@ server {
     # wrong: it would land in the 512 MB tmpfs cache and stall the download for
     # as long as it took to fill. Streamed straight through instead. The app
     # serves these asynchronously, so a slow client costs a task, not a thread.
-    location ^~ /api/renditions/ {
+    location ^~ /api/renditions {
         limit_req  zone=api burst=60 nodelay;
         proxy_buffering off;
         include /etc/nginx/proxy_common.conf;
@@ -142,7 +155,10 @@ server {
     # Uploads. Request buffering stays on (the default) so nginx holds the whole
     # 25 MB before the app is troubled with it — a slow upload occupies nginx,
     # which has workers to spare, rather than the one process doing synthesis.
-    location ^~ /api/uploads/ {
+    #
+    # This is the block the trailing-slash note above is about: the route is
+    # `POST /api/uploads`, with no path component to hide the problem.
+    location ^~ /api/uploads {
         limit_req  zone=api burst=20 nodelay;
         limit_conn conn 8;
         include /etc/nginx/proxy_common.conf;
